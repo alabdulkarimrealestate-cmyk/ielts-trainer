@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>مدرّب القواعد والكتابة — آيلتس</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>مدرّب القواعد والكتابة <span class="muted">— آيلتس</span></h1>
+    <div class="streak-chip" id="streakChip" title="أيام التتابع">🔥 <span id="streakDays">0</span></div>
+  </header>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab" data-view="session">جلسة ١٥ دقيقة</button>
+    <button class="tab" data-view="drill">التمارين</button>
+    <button class="tab" data-view="dashboard">لوحة التقدّم</button>
+    <button class="tab" data-view="dictionary">قاموسي الصوتي</button>
+    <button class="tab" data-view="writing">فحص الكتابة</button>
+  </nav>
+
+  <main id="app"><!-- views render here --></main>
+
+  <footer class="app-footer">
+    <button class="link-btn" id="exportBtn">⬇︎ تصدير بياناتي (JSON)</button>
+    <span class="muted small">يعمل بالكامل دون إنترنت — لا حسابات ولا خوادم.</span>
+  </footer>
+
+  <!-- بنوك العناصر (قابلة للتحرير يدوياً) -->
+  <script src="data/grammar_articles.js"></script>
+  <script src="data/grammar_verbform.js"></script>
+  <script src="data/grammar_copula.js"></script>
+  <script src="data/grammar_vocab.js"></script>
+  <script src="data/phonetics_stress.js"></script>
+  <script src="data/phonetics_sentence.js"></script>
+  <script src="data/phonetics_ipa.js"></script>
+  <script src="data/phonetics_schwa.js"></script>
+  <script src="data/phonetics_dictionary.js"></script>
+
+  <!-- منطق التطبيق -->
+  <script src="app.js"></script>
+</body>
+</html>
