@@ -73,6 +73,55 @@ topic
     ].join("\n");
   }
 
+  // Human-readable description of any drill item type (for the error chat).
+  function describeItem(item) {
+    if (item.rule === "word_stress")
+      return 'Word: "' + item.word + '" — mark the syllable with PRIMARY stress. Syllables: ' +
+             item.syllables.join(" · ") + '. Correct: "' + item.syllables[item.correct_index].toUpperCase() +
+             '" (IPA: ' + (item.ipa || "?") + ').';
+    if (item.rule === "sentence_stress")
+      return 'Sentence: "' + item.words.join(" ") + '" — mark the STRESSED (content) words. Correct: ' +
+             item.stressed.map(function (i) { return item.words[i]; }).join(", ") + '.';
+    if (item.rule === "schwa")
+      return 'Word: "' + item.word + '" — find the syllable(s) with schwa /ə/. Syllables: ' +
+             item.syllables.join(" · ") + '. Correct: ' +
+             item.schwa.map(function (i) { return item.syllables[i]; }).join(", ") +
+             ' (IPA: ' + (item.ipa || "?") + ').';
+    if (item.rule === "ipa")
+      return 'IPA question (' + item.direction + '): "' + item.prompt + '" — correct answer: "' +
+             item.correct_answer + '". Options were: ' +
+             [item.correct_answer].concat(item.distractors || []).join(", ") + '.';
+    return 'Sentence: "' + item.sentence_with_gap + '" — fill the gap. Correct answer: "' +
+           item.correct_answer + '". Options were: ' +
+           [item.correct_answer].concat(item.distractors || []).join(", ") + '.';
+  }
+
+  // Socratic error-discussion chat: paste into Claude, converse until mastery.
+  function errorChat(item, userAnswer, userReasoning) {
+    return [
+'أريد منك أن تدير معي حوارًا سقراطيًا حيًا (بالعربية) حول خطأ ارتكبته في تدريب IELTS،',
+'حتى أصل إلى الفهم الكامل. أنا متحدث عربية أستعد لـ IELTS أكاديمي (هدفي باند 7.0).',
+'',
+'=== الخطأ ===',
+'القاعدة المستهدفة: ' + (window.ruleLabel ? window.ruleLabel(item.rule) : item.rule),
+'السؤال: ' + describeItem(item),
+'إجابتي (الخاطئة): "' + userAnswer + '"',
+'تفكيري وقت الإجابة (كتبته قبل أن أعرف الحل): "' + (userReasoning || "—") + '"',
+'الشرح المختصر في التطبيق: ' + (item.explanation || "—"),
+'',
+'=== كيف تدير الحوار (مهم) ===',
+'1) ابدأ بتشخيص سوء الفهم الجذري من "تفكيري" المكتوب أعلاه — لا تفترض؛ استنتج من كلامي.',
+'2) حاورني بأسلوب سقراطي: سؤال واحد قصير في كل رسالة، وانتظر إجابتي. لا تُلقِ محاضرة.',
+'3) اربط الخطأ بتداخل اللغة العربية تحديدًا إن كان هذا هو السبب (قواعد العربية تختلف هنا؟ كيف؟).',
+'4) عندما أقترب من الفهم، اطلب مني أن أشرح القاعدة بكلماتي.',
+'5) في النهاية اختبرني بـ 3 أمثلة جديدة من نفس النمط (ليست من السؤال الأصلي)،',
+'   ولا تعتبر الحوار منتهيًا إلا إذا أجبتها كلها صحيحة مع تعليل سليم.',
+'6) كل الأمثلة الإنجليزية تبقى بالإنجليزية، والشرح والحوار بالعربية.',
+'',
+'ابدأ الآن بسؤالك التشخيصي الأول.'
+    ].join("\n");
+  }
+
   function copy(text, btn) {
     function done() {
       if (!btn) return;
@@ -96,6 +145,7 @@ topic
     writing: writingPrompt,
     translate: translatePrompt,
     image: imagePrompt,
+    errorChat: errorChat,
     copy: copy
   };
 })();

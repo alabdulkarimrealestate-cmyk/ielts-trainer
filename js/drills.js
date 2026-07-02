@@ -200,6 +200,22 @@
       }
       feedback.appendChild(el("div", "explain", item.explanation || ""));
 
+      // Wrong answer -> offer a live Socratic error-chat prompt for Claude,
+      // built from the user's OWN typed reasoning (the real misconception).
+      if (!correct) {
+        var chatBtn = el("button", "btn wide chat-btn", "💬 افهم خطأك — ناقشه مع Claude (نسخ)");
+        chatBtn.type = "button";
+        chatBtn.onclick = function () {
+          window.Prompts.copy(
+            window.Prompts.errorChat(item, ctrl.answerText(), reason.value.trim()),
+            chatBtn
+          );
+        };
+        feedback.appendChild(chatBtn);
+        feedback.appendChild(el("div", "chat-hint",
+          "انسخ ← افتح Claude ← الصق. سيحاورك سؤالًا بسؤال حتى الفهم الكامل، ثم يختبرك بأمثلة جديدة."));
+      }
+
       var next = el("button", "btn wide", "التالي ⟵");
       next.type = "button";
       next.onclick = function () { onNext(correct); };

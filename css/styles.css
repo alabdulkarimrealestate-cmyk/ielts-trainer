@@ -244,6 +244,12 @@ h1,h2,h3{margin:0 0 .4em}
 .lg-ans{font-size:14px; margin-top:4px}
 .lg-reason{font-size:13px; color:var(--muted); margin-top:2px}
 
+/* ---- error-chat button ---- */
+.chat-btn{border-color:var(--warn); color:var(--warn); background:transparent}
+.chat-btn:hover{background:rgba(199,125,10,.08); border-color:var(--warn)}
+.chat-hint{color:var(--muted); font-size:12px; margin:4px 0 8px; line-height:1.7}
+.log-row .chat-btn{margin-top:8px}
+
 /* ---- floating translate button ---- */
 .float-translate{position:fixed; inset-inline-start:16px; bottom:20px; z-index:40;
   background:var(--accent); color:#fff; border:none; border-radius:999px;

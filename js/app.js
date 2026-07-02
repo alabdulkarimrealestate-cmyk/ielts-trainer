@@ -443,6 +443,17 @@
         '<span class="lg-mark">' + (e.correct ? "✓" : "✗") + '</span></div>' +
         '<div class="lg-ans ltr">إجابتك: ' + escapeHtml(e.answer) + '</div>' +
         '<div class="lg-reason">سببك: ' + escapeHtml(e.reasoning || "—") + '</div>';
+      // Old mistakes stay discussable: rebuild the Socratic chat prompt.
+      if (!e.correct) {
+        var it = window.ALL_ITEMS.filter(function (x) { return x.id === e.itemId; })[0];
+        if (it) {
+          var cb = el("button", "btn small chat-btn", "💬 ناقش هذا الخطأ مع Claude");
+          cb.onclick = function () {
+            window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cb);
+          };
+          row.appendChild(cb);
+        }
+      }
       lb.appendChild(row);
     });
     wrap.appendChild(lb);
