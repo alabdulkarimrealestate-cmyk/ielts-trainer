@@ -1,45 +1,59 @@
-/* config.js — central rule registry + item aggregation. No framework. */
+/* config.js — builds the rule registry FROM registered modules.
+   ENGINE code: never edit this to add content — drop a module file in
+   data/modules/ and list it in data/modules/_index.js instead. */
 (function () {
   "use strict";
 
-  // Each rule is tracked INDEPENDENTLY. Never bundle scores across rules.
-  window.RULES = [
-    // Grammar (the core 4 target error patterns)
-    { id:"articles",         label:"الأدوات (a/an/the)",     group:"القواعد",   short:"الأدوات" },
-    { id:"verbform",         label:"صيغة الفعل",             group:"القواعد",   short:"الفعل" },
-    { id:"copula",           label:"الرابط والتطابق",        group:"القواعد",   short:"الرابط" },
-    { id:"meaning_reversal", label:"مفردات معكوسة المعنى",   group:"القواعد",   short:"مفردات" },
-    // Phonetic knowledge (text-only)
-    { id:"word_stress",      label:"نبر الكلمة",             group:"الصوتيات",  short:"نبر الكلمة" },
-    { id:"sentence_stress",  label:"نبر الجملة",             group:"الصوتيات",  short:"نبر الجملة" },
-    { id:"ipa",              label:"رموز IPA",               group:"الصوتيات",  short:"IPA" },
-    { id:"schwa",            label:"الشوا (schwa)",          group:"الصوتيات",  short:"schwa" },
-    // Lexical resource
-    { id:"collocations",     label:"المتلازمات اللفظية",     group:"المفردات",  short:"متلازمات" }
-  ];
+  var modules = window.MODULES || [];
 
+  // ---- rule registry (each rule tracked INDEPENDENTLY, never bundled) ----
+  window.RULES = [];
   window.RULE_MAP = {};
-  window.RULES.forEach(function (r) { window.RULE_MAP[r.id] = r; });
+  window.RULE_MODULE = {};   // ruleId -> its module object
+
+  modules.forEach(function (m) {
+    (m.rules || []).forEach(function (r) {
+      if (window.RULE_MAP[r.id]) return; // first registration wins
+      window.RULES.push(r);
+      window.RULE_MAP[r.id] = r;
+      window.RULE_MODULE[r.id] = m;
+    });
+  });
+
   window.ruleLabel = function (id) { return (window.RULE_MAP[id] || {}).label || id; };
 
-  // Gather every drill item from the data banks into one flat list.
-  window.ALL_ITEMS = [].concat(
-    window.BANK_GRAMMAR      || [],
-    window.BANK_VOCAB        || [],
-    window.BANK_WORD_STRESS  || [],
-    window.BANK_SENTENCE_STRESS || [],
-    window.BANK_IPA          || [],
-    window.BANK_SCHWA        || [],
-    window.BANK_COLLOCATIONS || []
-  );
-
-  // Default drill mode by rule when an item doesn't specify one.
-  window.itemMode = function (item) {
-    if (item.mode) return item.mode;
-    return "mc"; // grammar / vocab / collocations are multiple-choice
+  // effective drill mode of a rule: "active" | "maintenance" | "background"
+  window.ruleMode = function (ruleId) {
+    var m = window.RULE_MODULE[ruleId];
+    return (m && m.mode) || "active";
   };
+
+  window.moduleById = function (id) {
+    for (var i = 0; i < modules.length; i++)
+      if (modules[i].module_id === id) return modules[i];
+    return null;
+  };
+
+  window.stageForRule = function (ruleId) {
+    var m = window.RULE_MODULE[ruleId];
+    return m ? m.stage_id : null;
+  };
+
+  // ---- flat item pool ----
+  window.ALL_ITEMS = [];
+  modules.forEach(function (m) {
+    (m.items || []).forEach(function (i) { window.ALL_ITEMS.push(i); });
+  });
+
+  window.itemMode = function (item) { return item.mode || "mc"; };
 
   window.itemsForRule = function (ruleId) {
     return window.ALL_ITEMS.filter(function (i) { return i.rule === ruleId; });
   };
+
+  // rules whose stress cards carry the "read aloud now" bridge reminder
+  window.READ_ALOUD_RULES = {};
+  modules.forEach(function (m) {
+    (m.read_aloud_rules || []).forEach(function (r) { window.READ_ALOUD_RULES[r] = true; });
+  });
 })();

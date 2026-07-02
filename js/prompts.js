@@ -3,11 +3,46 @@
 (function () {
   "use strict";
 
-  function writingPrompt(essay) {
-    return [
+  // Current meaning-reversal watchlist, auto-pulled from module data + user additions.
+  function watchlistPairs() {
+    var mod = window.moduleById ? window.moduleById("reversal_pairs") : null;
+    var pairs = [];
+    ((mod && mod.items) || []).forEach(function (i) {
+      if (i.pair) pairs.push(i.pair.join("/"));
+    });
+    (window.Store && Store.addedPairs ? Store.addedPairs() : []).forEach(function (p) {
+      if (p.pair) pairs.push(p.pair.join("/"));
+    });
+    // dedupe
+    var seen = {}, out = [];
+    pairs.forEach(function (p) { if (!seen[p]) { seen[p] = 1; out.push(p); } });
+    return out;
+  }
+
+  // Current active stage(s) from the roadmap, for examiner context.
+  function currentStageLine() {
+    var active = [];
+    ((window.ROADMAP || {}).stages || []).forEach(function (s) {
+      var status = window.Engine ? window.Engine.stageStatus(s) : s.status;
+      if (status === "active") active.push(s.name_en);
+    });
+    return active.length ? active.join(" + ") : "Core grammar consolidation";
+  }
+
+  function writingPrompt(essay, taskPrompt) {
+    var pairs = watchlistPairs();
+    var head = [
 'You are an experienced IELTS Academic examiner. Evaluate the essay/paragraph below.',
 '',
 'CANDIDATE PROFILE: Arabic-L1 speaker, target band 7.0, background in accounting/CMA.',
+'CURRENT ROADMAP STAGE: ' + currentStageLine() + '.'
+    ];
+    if (taskPrompt) {
+      head.push('THE TASK 2 QUESTION WAS:');
+      head.push('"' + taskPrompt + '"');
+      head.push('Judge Task Response against THIS question.');
+    }
+    return head.concat([
 '',
 '=== TEXT TO EVALUATE ===',
 essay,
@@ -22,13 +57,15 @@ essay,
 '   • Lexical Resource',
 '   • Grammatical Range & Accuracy',
 '',
-'2) Tag EVERY grammar/vocabulary error by which of these 4 watchlist patterns it hits',
+'2) Tag EVERY grammar/vocabulary error by which of these watchlist patterns it hits',
 '   (label each error explicitly):',
 '   [ARTICLES]         a/an/the/zero-article misuse (incl. "an advice", "I have car")',
 '   [VERB-FORM]        wrong form after preposition/relative pronoun (e.g. "interested in to set")',
 '   [COPULA-AGREEMENT] missing is/are, or "the company have" instead of "has"',
-'   [MEANING-REVERSAL] confusable pair used with reversed meaning (e.g. employer/employee)',
-'   For any error outside these 4, tag it [OTHER].',
+'   [MEANING-REVERSAL] confusable pair used with reversed meaning.',
+'                      Current watchlist: ' + (pairs.length ? pairs.join(", ") : "employer/employee"),
+'   [CONNECTORS]       because/although/if/when — comma placement, incomplete clauses',
+'   For any error outside these, tag it [OTHER].',
 '',
 '3) Diagnostic integrity check: flag any CMA/finance-topic bias that may be INFLATING the',
 '   Lexical Resource score (i.e. strong vocabulary that is only strong because it is',
@@ -38,7 +75,7 @@ essay,
 '',
 'Format: scores first as a table, then the tagged error list, then the integrity note,',
 'then the 3 fixes. Be strict and specific — quote the exact words for each error.'
-    ].join("\n");
+    ]).join("\n");
   }
 
   function translatePrompt(text, context) {

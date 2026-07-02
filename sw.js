@@ -1,6 +1,6 @@
 /* sw.js — offline cache for the whole app (cache-first).
    Bump CACHE_VERSION whenever you edit any file so devices pick up changes. */
-var CACHE_VERSION = "ielts-trainer-v4";
+var CACHE_VERSION = "ielts-trainer-v5";
 
 var ASSETS = [
   "./",
@@ -12,7 +12,17 @@ var ASSETS = [
   "./data/phonetics.js",
   "./data/pron_dict.js",
   "./data/collocations.js",
+  "./data/writing_prompts.js",
+  "./data/roadmap.js",
+  "./data/modules/_index.js",
+  "./data/modules/articles.js",
+  "./data/modules/verb_forms.js",
+  "./data/modules/copula_agreement.js",
+  "./data/modules/reversal_pairs.js",
+  "./data/modules/phonetics.js",
+  "./data/modules/collocations.js",
   "./js/config.js",
+  "./js/engine.js",
   "./js/storage.js",
   "./js/sync.js",
   "./js/drills.js",

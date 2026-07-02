@@ -143,7 +143,9 @@
   }
 
   // Public: render item into container. onNext(isCorrect) called after reveal+next.
-  function render(item, container, onNext) {
+  // opts.mode: "calm" (default) | "load" — stored with the attempt.
+  function render(item, container, onNext, opts) {
+    opts = opts || {};
     container.innerHTML = "";
     var card = el("div", "drill-card");
     card.appendChild(questionNode(item));
@@ -182,7 +184,7 @@
       reason.disabled = true;
       revealBtn.classList.add("hidden");
 
-      Store.record(item, correct, ctrl.answerText(), reason.value.trim());
+      Store.record(item, correct, ctrl.answerText(), reason.value.trim(), opts.mode || "calm");
 
       feedback.classList.remove("hidden");
       feedback.classList.add(correct ? "ok" : "bad");
@@ -199,6 +201,13 @@
         feedback.appendChild(ipaL);
       }
       feedback.appendChild(el("div", "explain", item.explanation || ""));
+
+      // Stress cards bridge knowledge -> execution: remind to read aloud NOW.
+      // (Text reminder only — actual audio practice stays in ELSA.)
+      if (window.READ_ALOUD_RULES && window.READ_ALOUD_RULES[item.rule]) {
+        feedback.appendChild(el("div", "read-aloud",
+          "🗣 اقرأها بصوت عالٍ الآن ×٣ — بالنبر الصحيح قبل أن تنتقل"));
+      }
 
       // Wrong answer -> offer a live Socratic error-chat prompt for Claude,
       // built from the user's OWN typed reasoning (the real misconception).

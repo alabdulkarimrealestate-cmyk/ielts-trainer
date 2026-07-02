@@ -38,20 +38,33 @@
       (pct == null ? "—" : pct + "%") + '</text></svg>';
   }
 
+  var MODE_AR = { active: "نشطة", maintenance: "صيانة", background: "خلفية" };
+
   function card(rule) {
     var st = Store.ruleStat(rule.id);
     var acc = Store.accuracy(rule.id);
+    var mode = window.ruleMode(rule.id);
+    // calm vs load: consolidation is only real if it survives load
+    var calm = Store.modeAccuracy(rule.id, "calm", 30);
+    var load = Store.modeAccuracy(rule.id, "load", 30);
+    function pct(x) { return x === null ? "—" : Math.round(x.accuracy * 100) + "%"; }
+    var gap = (calm && load && calm.accuracy - load.accuracy >= 0.15);
+
     var c = el("div", "stat-card");
     c.innerHTML =
       '<div class="sc-top">' +
         '<div class="sc-ring">' + ring(acc) + '</div>' +
         '<div class="sc-meta">' +
-          '<div class="sc-name">' + rule.label + '</div>' +
+          '<div class="sc-name">' + rule.label +
+            ' <span class="mode-chip mode-' + mode + '">' + (MODE_AR[mode] || mode) + '</span></div>' +
           '<div class="sc-group">' + rule.group + '</div>' +
           '<div class="sc-nums">' +
             '<span>محاولات: <b>' + st.attempts + '</b></span>' +
             '<span>ستريك: <b>' + st.streak + '</b>🔥</span>' +
           '</div>' +
+          '<div class="sc-modes">هادئ: <b>' + pct(calm) + '</b> · تحت الضغط: <b class="' +
+            (gap ? "load-gap" : "") + '">' + pct(load) + '</b>' +
+            (gap ? ' <span class="load-gap">↓ ينهار تحت الضغط</span>' : '') + '</div>' +
           '<div class="sc-last">آخر تدريب: ' + (st.lastPracticed || "—") + '</div>' +
         '</div>' +
       '</div>' +

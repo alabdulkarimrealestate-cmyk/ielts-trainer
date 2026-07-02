@@ -14,6 +14,7 @@
 
   var ROUTES = [
     { id:"home",       label:"الرئيسية",     icon:"🏠" },
+    { id:"roadmap",    label:"الخريطة",      icon:"🗺️" },
     { id:"dashboard",  label:"لوحة التقدّم",  icon:"📊" },
     { id:"practice",   label:"تدرّب",         icon:"🎯" },
     { id:"writing",    label:"فحص الكتابة",   icon:"✍️" },
@@ -47,7 +48,36 @@
     big.onclick = function () { go("session"); };
     startCard.appendChild(big);
     startCard.appendChild(el("div", "start-note", "مجموعة مختلطة موزونة نحو أضعف قواعدك"));
+    var loadBtn = el("button", "btn load-cta wide", "⚡ جلسة تحت الضغط (بعدّاد)");
+    loadBtn.onclick = function () { go("load"); };
+    startCard.appendChild(loadBtn);
     wrap.appendChild(startCard);
+
+    // fragile-rules alert: closed/maintenance rules decaying silently
+    var fragile = window.Engine.fragileRules();
+    if (fragile.length) {
+      var fbox = el("div", "fragile-box");
+      fbox.appendChild(el("div", "fragile-title", "⚠ قواعد مغلقة بدأت تتآكل:"));
+      fragile.forEach(function (f) {
+        var chip = el("button", "fragile-chip",
+          window.ruleLabel(f.rule) + " · " + Math.round(f.accuracy * 100) + "%");
+        chip.onclick = function () { startRule(f.rule); };
+        fbox.appendChild(chip);
+      });
+      wrap.appendChild(fbox);
+    }
+
+    // monthly export reminder (a year of history must survive a cleared cache)
+    var lastExp = Store.lastExport();
+    var expDays = lastExp ? Math.floor((Date.now() - new Date(lastExp)) / 86400000) : null;
+    if ((lastExp && expDays >= 30) || (!lastExp && Store.get().log.length > 30)) {
+      var ebox = el("div", "export-reminder");
+      ebox.textContent = lastExp
+        ? "💾 مرّ " + expDays + " يومًا على آخر نسخة احتياطية — صدّر بياناتك من تبويب «البيانات»"
+        : "💾 لم تصدّر بياناتك بعد — افعلها مرة شهريًا من تبويب «البيانات»";
+      ebox.onclick = function () { go("data"); };
+      wrap.appendChild(ebox);
+    }
 
     // weakest rules hint
     var weak = window.RULES.map(function (r) {
@@ -85,11 +115,114 @@
     wrap.appendChild(host);
     view.appendChild(wrap);
 
-    var queue = Session.buildSession(15);
+    var mins = (Store.settings() || {}).sessionMinutes || 15;
+    var queue = Session.buildSession(Math.max(8, Math.round(mins)));
     Session.run(queue, host, {
-      kind: "session", progressEl: prog,
+      kind: "session", progressEl: prog, mode: "calm",
       onFinish: function (sum) { summaryView(sum, wrap, function () { go("session"); }); }
     });
+  }
+
+  /* ---------------- LOAD SESSION (timed, mixed old+new) ---------------- */
+  function loadSessionView() {
+    var wrap = el("div", "page");
+    var st = Store.settings() || {};
+    var intro = el("div", "load-intro");
+    intro.innerHTML =
+      '<h2 class="page-title">⚡ جلسة تحت الضغط</h2>' +
+      '<p class="muted-p">مجموعة مختلطة <b>بعدّاد تنازلي</b>: قواعد جديدة + قواعد قديمة مغلقة في نفس الجلسة. ' +
+      'التثبيت لا يُعتبر حقيقيًا إلا إذا صمد تحت الضغط — نتائجها تُحسب منفصلة عن الجلسات الهادئة وتُغذّي بوابات الإغلاق.</p>';
+    var startBtn = el("button", "btn primary huge", "ابدأ (" +
+      (st.loadItems || 10) + " أسئلة / " + Math.round((st.loadSeconds || 300) / 60) + " دقائق)");
+    intro.appendChild(startBtn);
+    wrap.appendChild(intro);
+    view.appendChild(wrap);
+
+    startBtn.onclick = function () {
+      clear(wrap);
+      var prog = el("div", "progress");
+      var host = el("div", "runner-host");
+      wrap.appendChild(prog); wrap.appendChild(host);
+      var queue = Session.buildLoadQueue(st.loadItems || 10);
+      Session.run(queue, host, {
+        kind: "load_session", progressEl: prog, mode: "load",
+        countdownSeconds: st.loadSeconds || 300,
+        onFinish: function (sum) { summaryView(sum, wrap, function () { go("load"); }); }
+      });
+    };
+  }
+
+  /* ---------------- ROADMAP (the year-long view) ---------------- */
+  var STATUS_META = {
+    locked:         { ar: "مقفلة",          cls: "st-locked" },
+    active:         { ar: "نشطة الآن",      cls: "st-active" },
+    closed_fragile: { ar: "مغلقة (هشّة)",   cls: "st-fragile" },
+    consolidated:   { ar: "مثبّتة ✓",       cls: "st-done" }
+  };
+
+  function roadmapView() {
+    var wrap = el("div", "page");
+    wrap.appendChild(el("h2", "page-title", "خريطة الطريق — من ٥ إلى ٧"));
+    wrap.appendChild(el("p", "muted-p",
+      "التطبيق يقترح عندما تبدو البوابة محقّقة؛ القرار النهائي لك مع مدرّبك — لا تقدّم تلقائي أبدًا."));
+
+    (window.ROADMAP.stages || []).forEach(function (stage) {
+      var status = window.Engine.stageStatus(stage);
+      var meta = STATUS_META[status] || STATUS_META.locked;
+      var card = el("div", "stage-card " + meta.cls);
+
+      var head = el("div", "stage-head");
+      head.innerHTML = '<span class="stage-name">' + stage.name_ar + '</span>' +
+                       '<span class="stage-status">' + meta.ar + '</span>';
+      card.appendChild(head);
+      if (stage.desc_ar) card.appendChild(el("div", "stage-desc", stage.desc_ar));
+
+      // gate progress per rule of this stage (skip locked stages)
+      if (status !== "locked") {
+        (stage.modules || []).forEach(function (mid) {
+          var mod = window.moduleById(mid);
+          if (!mod) {
+            card.appendChild(el("div", "stage-pending", "◌ " + mid + " — المحتوى لم يُضف بعد (يُفتح مع التدريس)"));
+            return;
+          }
+          (mod.rules || []).forEach(function (r) {
+            var gp = window.Engine.gateProgress(r.id);
+            var row = el("div", "gate-row");
+            if (!gp) {
+              row.innerHTML = '<span class="gr-name">' + r.short + '</span>' +
+                              '<span class="gr-note">عنصر خلفي دائم — بلا بوابة</span>';
+            } else {
+              var g = gp.gate;
+              row.innerHTML =
+                '<span class="gr-name">' + r.short + '</span>' +
+                '<span class="gr-prog">' + gp.passingSessions + '/' + g.min_load_sessions +
+                ' جلسات ضغط ≥' + Math.round(g.min_accuracy * 100) + '% · ' +
+                gp.distinctDays + '/' + g.min_days + ' أيام</span>' +
+                (gp.met ? '<span class="gr-met">🎯 البوابة تبدو محقّقة — أكّدها مع مدرّبك</span>' : '');
+            }
+            card.appendChild(row);
+          });
+        });
+
+        // manual status change (user + coach decision)
+        var sel = document.createElement("select");
+        sel.className = "stage-select";
+        Object.keys(STATUS_META).forEach(function (s) {
+          var o = document.createElement("option");
+          o.value = s; o.textContent = STATUS_META[s].ar;
+          if (s === status) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.onchange = function () {
+          if (confirm("تغيير حالة المرحلة يدويًا — بعد تأكيد مدرّبك؟")) {
+            Store.setStageStatus(stage.id, sel.value); go("roadmap");
+          } else { sel.value = status; }
+        };
+        card.appendChild(sel);
+      }
+      wrap.appendChild(card);
+    });
+    view.appendChild(wrap);
   }
 
   /* ---------------- PRACTICE (pick a rule) ---------------- */
@@ -142,22 +275,28 @@
   /* ---------------- SUMMARY ---------------- */
   function summaryView(sum, wrap, again) {
     clear(wrap);
-    var acc = sum.total ? Math.round((sum.correct / sum.total) * 100) : 0;
-    wrap.appendChild(el("h2", "page-title", "ملخّص الجلسة"));
+    var denom = sum.answered || sum.total;
+    var acc = denom ? Math.round((sum.correct / denom) * 100) : 0;
+    wrap.appendChild(el("h2", "page-title",
+      sum.mode === "load" ? "ملخّص جلسة الضغط ⚡" : "ملخّص الجلسة"));
+    if (sum.timedOut) {
+      wrap.appendChild(el("div", "timeout-note",
+        "⏱ انتهى الوقت — أجبت " + sum.answered + " من " + sum.total));
+    }
     var top = el("div", "sum-top");
     top.innerHTML = window.Dashboard.ring(acc) +
-      '<div class="sum-nums"><div class="sum-score">' + sum.correct + ' / ' + sum.total + '</div>' +
-      '<div class="sum-lbl">إجابات صحيحة</div></div>';
+      '<div class="sum-nums"><div class="sum-score">' + sum.correct + ' / ' + denom + '</div>' +
+      '<div class="sum-lbl">إجابات صحيحة' + (sum.mode === "load" ? " تحت الضغط" : "") + '</div></div>';
     wrap.appendChild(top);
 
     var list = el("div", "sum-list");
     Object.keys(sum.perRule).forEach(function (rid) {
       var p = sum.perRule[rid];
-      var pct = Math.round((p.c / p.a) * 100);
+      var pct = Math.round((p.c / p.n) * 100);
       var row = el("div", "sum-row");
       row.innerHTML = '<span class="sr-name">' + window.ruleLabel(rid) + '</span>' +
         '<span class="sr-bar"><span style="width:' + pct + '%"></span></span>' +
-        '<span class="sr-val">' + p.c + '/' + p.a + '</span>';
+        '<span class="sr-val">' + p.c + '/' + p.n + '</span>';
       list.appendChild(row);
     });
     wrap.appendChild(list);
@@ -184,8 +323,32 @@
   /* ---------------- WRITING CHECK ---------------- */
   function writingView() {
     var wrap = el("div", "page");
-    wrap.appendChild(el("h2", "page-title", "فحص الكتابة (بدون تكلفة)"));
-    wrap.appendChild(el("p", "muted-p", "الصق فقرة أو مقال Task 2. سيولّد التطبيق برومبت تقييم كامل تنسخه وتلصقه في Claude. التطبيق لا يُقيّم بنفسه."));
+    wrap.appendChild(el("h2", "page-title", "الكتابة (بدون تكلفة)"));
+
+    /* -- Task 2 prompt generator: general topics ONLY (no finance —
+          specialist vocabulary inflates Lexical Resource and masks range) -- */
+    var promptCard = el("div", "wp-card");
+    promptCard.appendChild(el("h3", "grp-title", "١ · موضوع Task 2 عشوائي"));
+    var promptBox = el("div", "wp-text ltr hidden");
+    var genPrompt = el("button", "btn wide", "🎲 أعطني موضوعًا (عام — بلا مالية)");
+    var currentPrompt = null;
+    genPrompt.onclick = function () {
+      var bank = window.WRITING_PROMPTS || [];
+      if (!bank.length) return;
+      var pick = bank[Math.floor(Math.random() * bank.length)];
+      currentPrompt = pick;
+      promptBox.textContent = pick.text;
+      promptBox.classList.remove("hidden");
+      genPrompt.textContent = "🎲 موضوع آخر";
+    };
+    promptCard.appendChild(genPrompt);
+    promptCard.appendChild(promptBox);
+    wrap.appendChild(promptCard);
+
+    /* -- essay + evaluation assembler -- */
+    wrap.appendChild(el("h3", "grp-title", "٢ · الصق مقالك"));
+    wrap.appendChild(el("p", "muted-p",
+      "اكتب في التطبيق أو على الورق ثم انقله هنا. يولّد التطبيق برومبت تقييم كاملًا (المعايير الأربعة + قائمة مراقبتك الحالية + مرحلتك) تلصقه في Claude. التطبيق لا يُقيّم بنفسه."));
     var ta = el("textarea", "big-input ltr");
     ta.rows = 10; ta.placeholder = "Paste your essay or paragraph here...";
     wrap.appendChild(ta);
@@ -193,12 +356,12 @@
     var out = el("textarea", "prompt-out ltr hidden"); out.rows = 10; out.readOnly = true;
     gen.onclick = function () {
       if (!ta.value.trim()) { ta.focus(); return; }
-      var p = window.Prompts.writing(ta.value.trim());
+      var p = window.Prompts.writing(ta.value.trim(), currentPrompt ? currentPrompt.text : null);
       out.value = p; out.classList.remove("hidden");
       window.Prompts.copy(p, gen);
     };
     wrap.appendChild(gen);
-    wrap.appendChild(el("div", "hint-line", "الخطوة التالية: افتح Claude، الصق، أرسل. سيعطيك درجة لكل معيار + وسم كل خطأ بأنماطك الأربعة."));
+    wrap.appendChild(el("div", "hint-line", "الخطوة التالية: افتح Claude، الصق، أرسل. سيعطيك درجة لكل معيار + وسم كل خطأ بأنماط قائمة مراقبتك."));
     wrap.appendChild(out);
     view.appendChild(wrap);
   }
@@ -477,6 +640,7 @@
       a.href = URL.createObjectURL(blob);
       a.download = "ielts-trainer-backup.json";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      Store.markExported();
     };
     wrap.appendChild(exportBtn);
 
@@ -500,30 +664,79 @@
     wrap.appendChild(importBtn);
     wrap.appendChild(fileInput);
 
-    wrap.appendChild(el("h3", "grp-title", "سجل الأسباب (آخر ٣٠)"));
-    var log = Store.fullLog().slice(0, 30);
-    if (!log.length) wrap.appendChild(el("p", "muted-p", "لا سجل بعد."));
-    var lb = el("div", "log-list");
-    log.forEach(function (e) {
-      var row = el("div", "log-row " + (e.correct ? "ok" : "bad"));
-      row.innerHTML =
-        '<div class="lg-top"><span class="lg-rule">' + window.ruleLabel(e.rule) + '</span>' +
-        '<span class="lg-mark">' + (e.correct ? "✓" : "✗") + '</span></div>' +
-        '<div class="lg-ans ltr">إجابتك: ' + escapeHtml(e.answer) + '</div>' +
-        '<div class="lg-reason">سببك: ' + escapeHtml(e.reasoning || "—") + '</div>';
-      // Old mistakes stay discussable: rebuild the Socratic chat prompt.
-      if (!e.correct) {
-        var it = window.ALL_ITEMS.filter(function (x) { return x.id === e.itemId; })[0];
-        if (it) {
-          var cb = el("button", "btn small chat-btn", "💬 ناقش هذا الخطأ مع Claude");
-          cb.onclick = function () {
-            window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cb);
-          };
-          row.appendChild(cb);
-        }
-      }
-      lb.appendChild(row);
+    wrap.appendChild(el("h3", "grp-title", "سجل الأسباب — مادة تشخيصية لجلسات التدريس"));
+
+    // filters: rule + period + mode (diagnostic material for coaching)
+    var filters = el("div", "log-filters");
+    var ruleSel = document.createElement("select");
+    ruleSel.className = "stage-select";
+    var oAll = document.createElement("option");
+    oAll.value = ""; oAll.textContent = "كل القواعد"; ruleSel.appendChild(oAll);
+    window.RULES.forEach(function (r) {
+      var o = document.createElement("option");
+      o.value = r.id; o.textContent = r.label; ruleSel.appendChild(o);
     });
+    var daySel = document.createElement("select");
+    daySel.className = "stage-select";
+    [["7", "آخر ٧ أيام"], ["30", "آخر ٣٠ يومًا"], ["", "كل الفترة"]].forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = p[0]; o.textContent = p[1]; daySel.appendChild(o);
+    });
+    daySel.value = "30";
+    var modeSel = document.createElement("select");
+    modeSel.className = "stage-select";
+    [["", "الوضعان"], ["calm", "هادئ"], ["load", "تحت الضغط ⚡"]].forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = p[0]; o.textContent = p[1]; modeSel.appendChild(o);
+    });
+    filters.appendChild(ruleSel); filters.appendChild(daySel); filters.appendChild(modeSel);
+    wrap.appendChild(filters);
+
+    var log = [];
+    function applyFilters() {
+      var days = daySel.value ? parseInt(daySel.value, 10) : null;
+      var cutoff = null;
+      if (days) {
+        var d = new Date(); d.setDate(d.getDate() - days);
+        cutoff = d.toISOString().slice(0, 10);
+      }
+      log = Store.fullLog().filter(function (e) {
+        if (ruleSel.value && e.rule !== ruleSel.value) return false;
+        if (modeSel.value && (e.mode || "calm") !== modeSel.value) return false;
+        if (cutoff && e.date < cutoff) return false;
+        return true;
+      }).slice(0, 100);
+      renderLog();
+    }
+    ruleSel.onchange = applyFilters; daySel.onchange = applyFilters; modeSel.onchange = applyFilters;
+    var lb = el("div", "log-list");
+    function renderLog() {
+      clear(lb);
+      if (!log.length) { lb.appendChild(el("p", "muted-p", "لا سجل مطابق للفلاتر.")); return; }
+      log.forEach(function (e) {
+        var row = el("div", "log-row " + (e.correct ? "ok" : "bad"));
+        row.innerHTML =
+          '<div class="lg-top"><span class="lg-rule">' + window.ruleLabel(e.rule) +
+          ((e.mode || "calm") === "load" ? ' <span class="lg-mode">⚡</span>' : '') +
+          '</span><span class="lg-date">' + (e.date || "") + '</span>' +
+          '<span class="lg-mark">' + (e.correct ? "✓" : "✗") + '</span></div>' +
+          '<div class="lg-ans ltr">إجابتك: ' + escapeHtml(e.answer) + '</div>' +
+          '<div class="lg-reason">سببك: ' + escapeHtml(e.reasoning || "—") + '</div>';
+        // Old mistakes stay discussable: rebuild the Socratic chat prompt.
+        if (!e.correct) {
+          var it = window.ALL_ITEMS.filter(function (x) { return x.id === e.itemId; })[0];
+          if (it) {
+            var cb = el("button", "btn small chat-btn", "💬 ناقش هذا الخطأ مع Claude");
+            cb.onclick = function () {
+              window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cb);
+            };
+            row.appendChild(cb);
+          }
+        }
+        lb.appendChild(row);
+      });
+    }
+    applyFilters();
     wrap.appendChild(lb);
 
     var reset = el("button", "btn ghost danger", "حذف كل التقدّم");
@@ -541,7 +754,8 @@
   }
 
   var VIEWS = {
-    home: homeView, session: sessionView, practice: practiceView,
+    home: homeView, session: sessionView, load: loadSessionView,
+    roadmap: roadmapView, practice: practiceView,
     dashboard: dashboardView, writing: writingView, translate: translateView,
     dictionary: dictionaryView, reference: referenceView,
     diagrams: diagramsView, data: dataView

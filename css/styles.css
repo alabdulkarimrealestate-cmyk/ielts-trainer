@@ -244,6 +244,61 @@ h1,h2,h3{margin:0 0 .4em}
 .lg-ans{font-size:14px; margin-top:4px}
 .lg-reason{font-size:13px; color:var(--muted); margin-top:2px}
 
+/* ---- roadmap / stages ---- */
+.stage-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:10px 0}
+.stage-card.st-active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+.stage-card.st-fragile{border-color:var(--warn)}
+.stage-card.st-done{border-color:var(--good)}
+.stage-card.st-locked{opacity:.55}
+.stage-head{display:flex; justify-content:space-between; align-items:center; gap:8px}
+.stage-name{font-weight:700}
+.stage-status{font-size:12px; color:var(--muted); white-space:nowrap}
+.st-active .stage-status{color:var(--accent); font-weight:700}
+.st-fragile .stage-status{color:var(--warn); font-weight:700}
+.st-done .stage-status{color:var(--good); font-weight:700}
+.stage-desc{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.7}
+.stage-pending{font-size:12px; color:var(--muted); margin-top:8px; font-style:italic}
+.gate-row{display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:12px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line)}
+.gr-name{font-weight:700}
+.gr-prog,.gr-note{color:var(--muted)}
+.gr-met{color:var(--good); font-weight:700; width:100%}
+.stage-select{margin-top:10px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink); font-family:inherit; font-size:13px}
+
+/* ---- load session ---- */
+.load-cta{border-color:var(--warn); color:var(--warn); margin-top:10px}
+.load-cta:hover{background:rgba(199,125,10,.08)}
+.countdown{font-weight:800; font-size:18px; color:var(--warn); text-align:center; margin-top:6px; font-variant-numeric:tabular-nums}
+.countdown.danger{color:var(--bad); animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.5}}
+.timeout-note{background:rgba(199,125,10,.1); border:1px solid var(--warn); color:var(--warn); border-radius:10px; padding:10px; margin:10px 0; font-size:13px}
+.load-intro .muted-p{line-height:1.9}
+
+/* ---- fragile alert + export reminder ---- */
+.fragile-box{background:rgba(199,125,10,.07); border:1px solid var(--warn); border-radius:12px; padding:10px; margin:12px 0}
+.fragile-title{font-size:13px; font-weight:700; color:var(--warn); margin-bottom:6px}
+.fragile-chip{display:inline-block; margin:2px; padding:5px 10px; border-radius:99px; border:1px solid var(--warn); background:transparent; color:var(--warn); font-family:inherit; font-size:12px; cursor:pointer}
+.export-reminder{background:var(--card); border:1px dashed var(--line); border-radius:10px; padding:10px; margin:10px 0; font-size:12px; color:var(--muted); cursor:pointer; text-align:center}
+
+/* ---- calm vs load on stat cards ---- */
+.mode-chip{font-size:10px; padding:2px 7px; border-radius:99px; border:1px solid var(--line); color:var(--muted); vertical-align:middle}
+.mode-chip.mode-active{border-color:var(--accent); color:var(--accent)}
+.mode-chip.mode-maintenance{border-color:var(--warn); color:var(--warn)}
+.sc-modes{font-size:12px; color:var(--muted); margin-top:2px}
+.load-gap{color:var(--bad); font-weight:700}
+
+/* ---- read-aloud reminder ---- */
+.read-aloud{background:rgba(15,118,110,.08); border:1px solid var(--brand); color:var(--brand); border-radius:10px; padding:9px 12px; margin:8px 0; font-size:13px; font-weight:700}
+
+/* ---- writing prompt generator ---- */
+.wp-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px}
+.wp-text{margin-top:10px; padding:12px; background:var(--bg); border-radius:10px; font-size:14px; line-height:1.7}
+
+/* ---- log filters ---- */
+.log-filters{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px}
+.log-filters .stage-select{margin-top:0; flex:1; min-width:110px}
+.lg-mode{color:var(--warn)}
+.lg-date{font-size:11px; color:var(--muted)}
+
 /* ---- auto-sync box ---- */
 .sync-box{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:14px 0}
 .sync-steps{font-size:13px; color:var(--muted); line-height:2; margin:8px 0}

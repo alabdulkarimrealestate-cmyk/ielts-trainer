@@ -73,6 +73,17 @@
     var log = unionBy(a.log || [], b.log || [], function (e) {
       return e.ts + "|" + e.itemId;
     }, 5000);
+    // newer overall state wins for scalar/dict fields without per-entry keys
+    var newer = String(a.updatedAt || "") >= String(b.updatedAt || "") ? a : b;
+    var older = newer === a ? b : a;
+    // leitner: per item, the entry with the LATER due date is the more recent rep
+    var leitner = {};
+    [older.leitner || {}, newer.leitner || {}].forEach(function (src) {
+      Object.keys(src).forEach(function (id) {
+        var cur = leitner[id];
+        if (!cur || String(src[id].due || "") > String(cur.due || "")) leitner[id] = src[id];
+      });
+    });
     return {
       rules: recomputeRules(log),
       log: log,
@@ -85,6 +96,10 @@
       addedPairs: unionBy(a.addedPairs || [], b.addedPairs || [], function (p) {
         return JSON.stringify(p);
       }),
+      leitner: leitner,
+      stageStatus: Object.assign({}, older.stageStatus || {}, newer.stageStatus || {}),
+      settings: Object.assign({}, older.settings || {}, newer.settings || {}),
+      lastExport: String(a.lastExport || "") > String(b.lastExport || "") ? a.lastExport : b.lastExport,
       updatedAt: new Date().toISOString()
     };
   }
