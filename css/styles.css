@@ -244,6 +244,14 @@ h1,h2,h3{margin:0 0 .4em}
 .lg-ans{font-size:14px; margin-top:4px}
 .lg-reason{font-size:13px; color:var(--muted); margin-top:2px}
 
+/* ---- auto-sync box ---- */
+.sync-box{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:14px 0}
+.sync-steps{font-size:13px; color:var(--muted); line-height:2; margin:8px 0}
+.sync-status{font-size:13px; margin-top:8px; color:var(--muted)}
+.sync-status.ok{color:var(--good)}
+.sync-status.error{color:var(--bad)}
+.sync-status.syncing{color:var(--warn)}
+
 /* ---- error-chat button ---- */
 .chat-btn{border-color:var(--warn); color:var(--warn); background:transparent}
 .chat-btn:hover{background:rgba(199,125,10,.08); border-color:var(--warn)}

@@ -44,7 +44,10 @@
   var state = load();
 
   function save() {
+    state.updatedAt = new Date().toISOString();
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    // notify sync layer (set by sync.js) — never let it break a save
+    try { if (Store.onChange) Store.onChange(); } catch (e) {}
   }
 
   var Store = {
@@ -77,12 +80,12 @@
         reasoning: reasoning || "",
         correct: !!isCorrect
       });
-      if (state.log.length > 2000) state.log = state.log.slice(-2000);
+      if (state.log.length > 5000) state.log = state.log.slice(-5000);
       save();
     },
 
     recordSession: function (summary) {
-      state.sessions.push(Object.assign({ date: todayStr() }, summary));
+      state.sessions.push(Object.assign({ ts: new Date().toISOString(), date: todayStr() }, summary));
       if (state.sessions.length > 200) state.sessions.shift();
       save();
     },

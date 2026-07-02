@@ -24,7 +24,10 @@
     { id:"data",       label:"البيانات",      icon:"💾" }
   ];
 
+  var currentRoute = "home";
+
   function go(route, arg) {
+    currentRoute = route;
     window.scrollTo(0, 0);
     clear(view);
     (VIEWS[route] || VIEWS.home)(arg);
@@ -402,6 +405,71 @@
     var totalAttempts = window.RULES.reduce(function (a, r) { return a + Store.ruleStat(r.id).attempts; }, 0);
     wrap.appendChild(el("p", "muted-p", "إجمالي المحاولات: " + totalAttempts + " · السجلات المخزّنة: " + s.log.length));
 
+    /* ---- auto-sync (GitHub Gist) ---- */
+    var syncBox = el("div", "sync-box");
+    syncBox.appendChild(el("h3", "grp-title", "☁ المزامنة التلقائية بين الأجهزة"));
+
+    var statusLine = el("div", "sync-status");
+    function paintStatus() {
+      var st = window.Sync.status();
+      var labels = {
+        off: "غير مفعّلة",
+        idle: "بانتظار أول مزامنة…",
+        syncing: "جارِ المزامنة…",
+        ok: "✓ متزامن" + (window.Sync.lastSync() ? " — آخر مزامنة: " + new Date(window.Sync.lastSync()).toLocaleString("ar") : ""),
+        offline: "⏸ " + (st.msg || "دون اتصال"),
+        error: "⚠ " + (st.msg || "خطأ")
+      };
+      statusLine.textContent = labels[st.state] || st.state;
+      statusLine.className = "sync-status " + st.state;
+    }
+    window.Sync.onStatus(paintStatus);
+    paintStatus();
+
+    if (!window.Sync.enabled()) {
+      syncBox.appendChild(el("p", "muted-p",
+        "فعّلها مرة واحدة على كل جهاز، وبعدها يُرفع تقدّمك تلقائيًا بعد كل إجابة ويُدمج عند الفتح — " +
+        "تتدرّب على الموبايل وتكمل من الكمبيوتر والعكس."));
+      var steps = el("div", "sync-steps");
+      steps.innerHTML =
+        '<b>خطوات إنشاء التوكن (مرة واحدة):</b><br>' +
+        '١. افتح <span class="ltr">github.com/settings/tokens</span><br>' +
+        '٢. Generate new token (classic)<br>' +
+        '٣. علّم صلاحية <b>gist فقط</b> — لا شيء آخر<br>' +
+        '٤. انسخ التوكن والصقه هنا:';
+      syncBox.appendChild(steps);
+      var tokenInput = document.createElement("input");
+      tokenInput.type = "password"; tokenInput.className = "reason ltr";
+      tokenInput.placeholder = "ghp_xxxxxxxxxxxx";
+      syncBox.appendChild(tokenInput);
+      var enableBtn = el("button", "btn primary wide", "تفعيل المزامنة");
+      enableBtn.onclick = function () {
+        var tk = tokenInput.value.trim();
+        if (!tk) { alert("الصق التوكن أولًا."); return; }
+        enableBtn.disabled = true; enableBtn.textContent = "جارِ التفعيل…";
+        window.Sync.enable(tk).then(function () { go("data"); })
+          .catch(function () { enableBtn.disabled = false; enableBtn.textContent = "تفعيل المزامنة"; });
+      };
+      syncBox.appendChild(enableBtn);
+    } else {
+      var syncNow = el("button", "btn wide", "↻ مزامنة الآن");
+      syncNow.onclick = function () {
+        window.Sync.pull().then(function (changed) {
+          return window.Sync.push().then(function () { if (changed) go("data"); });
+        });
+      };
+      syncBox.appendChild(syncNow);
+      var offBtn = el("button", "btn small", "إيقاف المزامنة على هذا الجهاز");
+      offBtn.onclick = function () {
+        if (confirm("سيُحذف التوكن من هذا الجهاز فقط. بياناتك المحلية والسحابية تبقى كما هي. متابعة؟")) {
+          window.Sync.disable(); go("data");
+        }
+      };
+      syncBox.appendChild(offBtn);
+    }
+    syncBox.appendChild(statusLine);
+    wrap.appendChild(syncBox);
+
     var exportBtn = el("button", "btn primary wide", "⬇ تصدير التقدّم + سجل الأسباب (JSON)");
     exportBtn.onclick = function () {
       var blob = new Blob([Store.exportJSON()], { type: "application/json" });
@@ -528,7 +596,7 @@
     go("home");
   }
 
-  window.App = { go: go, startRule: startRule };
+  window.App = { go: go, startRule: startRule, current: function () { return currentRoute; } };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else { boot(); }
