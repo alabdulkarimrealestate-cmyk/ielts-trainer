@@ -338,6 +338,14 @@
         sel.onchange = function () { AI.setModel(sel.value); status.textContent = "✓ مفعّل — النموذج: " + AI.model(); };
         box.appendChild(field("النموذج", sel));
       }
+      var cds = AI.cooldowns(), cdKeys = Object.keys(cds);
+      if (cdKeys.length) {
+        var cdBox = el("div", "export-reminder", "⏳ نماذج نفدت حصّتها المجانية مؤقتًا (يتخطّاها التطبيق تلقائيًا): " +
+          cdKeys.map(function (m) { var h = Math.max(1, Math.ceil((cds[m] - Date.now()) / 3600000)); return m + " (~" + h + " س)"; }).join(" · ") + " — اضغط لإعادة المحاولة بها.");
+        cdBox.onclick = function () { AI.clearCooldowns(); go("plan"); };
+        box.appendChild(cdBox);
+      }
+      box.appendChild(noteP("الحصص المجانية لكل نموذج على حدة؛ عند نفاد حصّة نموذج يتحوّل التطبيق تلقائيًا إلى التالي (flash-lite أوسع حصّة). لو المفتاح نفسه مستخدم في تطبيقات أخرى (ميزان/التوصيل) فحصّته مشتركة — أنشئ مفتاحًا من مشروع Google Cloud جديد لحصّة مستقلة.", "muted-p small-p"));
       box.appendChild(btn("إيقاف وحذف المفتاح من هذا الجهاز", "small", function () {
         if (confirm("سيُحذف المفتاح من هذا الجهاز فقط. متابعة؟")) { AI.disable(); go("plan"); }
       }));

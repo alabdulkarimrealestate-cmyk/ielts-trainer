@@ -8,7 +8,9 @@
   var CFG_KEY = "ielts_ai_cfg";
   var BASE = "https://generativelanguage.googleapis.com/v1beta";
   var DEFAULT_MODEL = "gemini-2.5-flash";
-  var STATIC_FALLBACKS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
+  // Free-tier quotas are PER MODEL: when one is exhausted (429) the next is tried.
+  var STATIC_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.0-flash-lite"];
+  var PREFER = [/2\.5-flash-lite/, /2\.5-flash(?!-lite)/, /2\.0-flash-lite/, /2\.0-flash/, /flash-latest/, /flash/, /pro/];
 
   function loadCfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) { return {}; }
@@ -31,14 +33,19 @@
   function mapHttpError(status, body, modelName) {
     var msg = "";
     try { msg = (body && body.error && body.error.message) || ""; } catch (e) {}
-    var retry = null;
+    var retrySec = null;
     try {
-      (body.error.details || []).forEach(function (d) { if (d.retryDelay) retry = d.retryDelay; });
+      (body.error.details || []).forEach(function (d) {
+        if (d.retryDelay) { var n = parseFloat(String(d.retryDelay)); if (isFinite(n)) retrySec = Math.round(n); }
+      });
     } catch (e) {}
     if (status === 400 && /api key not valid|API_KEY_INVALID/i.test(msg)) return aiError("bad_key", "المفتاح غير صالح — تأكد من نسخه كاملًا من Google AI Studio.");
     if (status === 401 || status === 403) return aiError("bad_key", "المفتاح مرفوض (403) — تحقّق من صلاحيته ومن قيود الاستخدام في AI Studio.");
     if (status === 404) return aiError("no_model", "النموذج «" + modelName + "» غير متاح — اختر نموذجًا آخر من الإعدادات.", { model: modelName });
-    if (status === 429) return aiError("quota", "تجاوزت حدّ الطبقة المجانية مؤقتًا" + (retry ? " — أعد المحاولة بعد " + retry : " — انتظر دقيقة ثم أعد المحاولة") + "، أو استخدم مسار النسخ إلى Claude.");
+    if (status === 429) {
+      var when = retrySec == null ? "بعد قليل" : retrySec >= 3600 ? "بعد ~" + Math.ceil(retrySec / 3600) + " ساعة" : retrySec >= 60 ? "بعد ~" + Math.ceil(retrySec / 60) + " دقيقة" : "بعد " + retrySec + " ثانية";
+      return aiError("quota", "نفد حدّ الطبقة المجانية لنموذج «" + modelName + "» مؤقتًا (يعود " + when + ").", { model: modelName, retrySec: retrySec == null ? 60 : retrySec });
+    }
     if (status >= 500) return aiError("server", "خدمة Gemini غير متاحة حاليًا (" + status + ") — حاول لاحقًا أو استخدم مسار النسخ.");
     if (status === 400) return aiError("bad_request", "طلب مرفوض (400): " + (msg ? msg.slice(0, 160) : "تحقّق من الإعدادات."));
     return aiError("http", "خطأ من Gemini (" + status + ")" + (msg ? ": " + msg.slice(0, 120) : ""));
@@ -118,11 +125,43 @@
     return parts.map(function (p) { return p.text || ""; }).join("");
   }
 
+  // Models whose free quota is exhausted are skipped until Google's retry time.
+  function cooldowns() { return cfg.cooldown || {}; }
+  function markExhausted(m, sec) {
+    cfg.cooldown = cooldowns(); cfg.cooldown[m] = Date.now() + Math.max(60, sec || 60) * 1000; saveCfg();
+  }
+  function inCooldown(m) { var t = cooldowns()[m]; return !!(t && t > Date.now()); }
+
+  // Preferred model first, then the key's other models in a sensible order
+  // (lite flash models have the roomiest free tiers), then static names.
   function modelCandidates() {
-    var candidates = [model()].concat((cfg.models || []).filter(function (m) { return m !== model(); }).slice(0, 2),
-                                      STATIC_FALLBACKS.filter(function (m) { return m !== model(); }));
+    var known = (cfg.models || []).slice();
+    var ordered = [];
+    PREFER.forEach(function (re) { known.forEach(function (m) { if (re.test(m) && ordered.indexOf(m) === -1) ordered.push(m); }); });
+    var candidates = [model()].concat(ordered, STATIC_FALLBACKS);
     var seen = {};
-    return candidates.filter(function (m) { if (seen[m]) return false; seen[m] = 1; return true; });
+    return candidates.filter(function (m) { if (!m || seen[m]) return false; seen[m] = 1; return true; });
+  }
+
+  // Shared retry policy for one call: 404 → next model; 429 → remember the
+  // cooldown and try the next model; "thinking" rejected → retry without it.
+  function withFallback(candidates, run) {
+    var firstQuota = null;
+    function attempt(idx, withThinking) {
+      while (idx < candidates.length && inCooldown(candidates[idx])) idx++;
+      if (idx >= candidates.length) {
+        if (firstQuota) { firstQuota.ar += " جرّبتُ النماذج البديلة أيضًا — استخدم مسار النسخ إلى Claude أو أنشئ مفتاحًا من مشروع Google Cloud جديد."; firstQuota.message = firstQuota.ar; return Promise.reject(firstQuota); }
+        return Promise.reject(aiError("no_model", "لا يوجد نموذج Gemini متاح لهذا المفتاح الآن — افتح الإعدادات واختر نموذجًا."));
+      }
+      var m = candidates[idx];
+      return run(m, withThinking).catch(function (err) {
+        if (err && err.code === "no_model") return attempt(idx + 1, withThinking);
+        if (err && err.code === "quota") { markExhausted(m, err.extra && err.extra.retrySec); if (!firstQuota) firstQuota = err; return attempt(idx + 1, withThinking); }
+        if (err && err.code === "bad_request" && withThinking && /thinking/i.test(err.message || "")) return attempt(idx, false);
+        throw err;
+      });
+    }
+    return attempt(0, true);
   }
 
   // Multi-turn plain-text chat. history: [{ role: "user" | "model", text }].
@@ -133,34 +172,22 @@
       return { role: h.role === "model" ? "model" : "user", parts: [{ text: String(h.text || "") }] };
     });
     if (!contents.length) return Promise.reject(aiError("bad_request", "لا رسالة لإرسالها."));
-    var candidates = modelCandidates();
-    function attempt(idx, withThinking) {
-      if (idx >= candidates.length) return Promise.reject(aiError("no_model", "لا يوجد نموذج Gemini متاح لهذا المفتاح — افتح الإعدادات واختر نموذجًا."));
-      var m = candidates[idx];
+    return withFallback(modelCandidates(), function (m, withThinking) {
       var gen = { temperature: opts.temperature != null ? opts.temperature : 0.7, maxOutputTokens: opts.maxOutputTokens || 1024 };
       if (withThinking && /2\.5/.test(m)) gen.thinkingConfig = { thinkingBudget: 0 };
       var body = { contents: contents, generationConfig: gen };
       if (system) body.systemInstruction = { parts: [{ text: system }] };
       return request("/models/" + encodeURIComponent(m) + ":generateContent", { method: "POST", body: body, modelName: m })
-        .then(function (data) { return extractText(data).trim(); })
-        .catch(function (err) {
-          if (err && err.code === "no_model") return attempt(idx + 1, withThinking);
-          if (err && err.code === "bad_request" && withThinking && /thinking/i.test(err.message || "")) return attempt(idx, false);
-          throw err;
-        });
-    }
-    return attempt(0, true);
+        .then(function (data) { var t = extractText(data).trim(); lastUsedModel = m; return t; });
+    });
   }
+  var lastUsedModel = null;
 
   // One JSON-mode call. Tries the configured model, then the known fallbacks
   // on "model not found"; drops thinkingConfig if the model rejects it.
   function generateJSON(prompt, schema, opts) {
     opts = opts || {};
-    var candidates = modelCandidates();
-
-    function attempt(idx, withThinking) {
-      if (idx >= candidates.length) return Promise.reject(aiError("no_model", "لا يوجد نموذج Gemini متاح لهذا المفتاح — افتح الإعدادات واختر نموذجًا."));
-      var m = candidates[idx];
+    return withFallback(modelCandidates(), function (m, withThinking) {
       var gen = { responseMimeType: "application/json", temperature: opts.temperature != null ? opts.temperature : 0.2, maxOutputTokens: opts.maxOutputTokens || 8192 };
       if (schema) gen.responseSchema = schema;
       if (withThinking && /2\.5/.test(m)) gen.thinkingConfig = { thinkingBudget: 0 };
@@ -172,16 +199,10 @@
           var obj = null;
           try { obj = JSON.parse(text); } catch (e) { obj = window.Prompts && window.Prompts.parseJSON ? window.Prompts.parseJSON(text) : null; }
           if (!obj) throw aiError("parse", "تعذّر قراءة ردّ النموذج كبيانات — جرّب مرة أخرى أو الصق الردّ يدويًا.", { raw: text });
-          obj.__model = m;
+          obj.__model = m; lastUsedModel = m;
           return obj;
-        })
-        .catch(function (err) {
-          if (err && err.code === "no_model") return attempt(idx + 1, withThinking);
-          if (err && err.code === "bad_request" && withThinking && /thinking/i.test(err.message || "")) return attempt(idx, false);
-          throw err;
         });
-    }
-    return attempt(0, true);
+    });
   }
 
   /* ---------------- high-level tasks ---------------- */
@@ -221,6 +242,9 @@
 
   window.AI = {
     enabled: enabled, model: model, models: function () { return cfg.models || []; },
+    lastUsedModel: function () { return lastUsedModel; },
+    cooldowns: function () { var c = cooldowns(), out = {}; Object.keys(c).forEach(function (m) { if (c[m] > Date.now()) out[m] = c[m]; }); return out; },
+    clearCooldowns: function () { cfg.cooldown = {}; saveCfg(); },
     lastOk: function () { return cfg.lastOk || null; },
     enable: enable, disable: disable, setModel: setModel, listModels: listModels,
     generateJSON: generateJSON, chat: chat,
