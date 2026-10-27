@@ -1,45 +1,45 @@
 /* sw.js — offline cache for the whole app (cache-first).
    Bump CACHE_VERSION whenever you edit any file so devices pick up changes. */
-var CACHE_VERSION = "ielts-trainer-v10";
+var CACHE_VERSION = "ielts-trainer-v11";
 
 var ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./css/styles.css",
-  "./data/grammar.js",
-  "./data/vocab.js",
-  "./data/phonetics.js",
-  "./data/pron_dict.js",
-  "./data/collocations.js",
-  "./data/writing_prompts.js",
-  "./data/roadmap.js",
-  "./data/plan.js",
-  "./data/speaking_cards.js",
-  "./data/vocab_awl.js",
-  "./data/modules/_index.js",
-  "./data/modules/articles.js",
-  "./data/modules/verb_forms.js",
-  "./data/modules/copula_agreement.js",
-  "./data/modules/reversal_pairs.js",
-  "./data/modules/phonetics.js",
-  "./data/modules/collocations.js",
-  "./data/modules/vocab_awl.js",
-  "./js/config.js",
-  "./js/engine.js",
-  "./js/plan.js",
-  "./js/tracker.js",
-  "./js/ai.js",
-  "./js/storage.js",
-  "./js/sync.js",
-  "./js/drills.js",
-  "./js/session.js",
-  "./js/diagrams.js",
-  "./js/dashboard.js",
-  "./js/prompts.js",
-  "./js/chat.js",
-  "./js/views_prep.js",
-  "./js/app.js",
+  "./css/styles.css?v=11",
+  "./data/grammar.js?v=11",
+  "./data/vocab.js?v=11",
+  "./data/phonetics.js?v=11",
+  "./data/pron_dict.js?v=11",
+  "./data/collocations.js?v=11",
+  "./data/writing_prompts.js?v=11",
+  "./data/roadmap.js?v=11",
+  "./data/plan.js?v=11",
+  "./data/speaking_cards.js?v=11",
+  "./data/vocab_awl.js?v=11",
+  "./data/modules/_index.js?v=11",
+  "./data/modules/articles.js?v=11",
+  "./data/modules/verb_forms.js?v=11",
+  "./data/modules/copula_agreement.js?v=11",
+  "./data/modules/reversal_pairs.js?v=11",
+  "./data/modules/phonetics.js?v=11",
+  "./data/modules/collocations.js?v=11",
+  "./data/modules/vocab_awl.js?v=11",
+  "./js/config.js?v=11",
+  "./js/engine.js?v=11",
+  "./js/plan.js?v=11",
+  "./js/tracker.js?v=11",
+  "./js/ai.js?v=11",
+  "./js/storage.js?v=11",
+  "./js/sync.js?v=11",
+  "./js/drills.js?v=11",
+  "./js/session.js?v=11",
+  "./js/diagrams.js?v=11",
+  "./js/dashboard.js?v=11",
+  "./js/prompts.js?v=11",
+  "./js/chat.js?v=11",
+  "./js/views_prep.js?v=11",
+  "./js/app.js?v=11",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png"
@@ -64,8 +64,11 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
+  // The page itself ignores the query (?date=… must work offline); every other
+  // asset matches its exact ?v= stamp, so a new release is never served stale.
+  var isPage = e.request.mode === "navigate" || /\/(index\.html)?(\?.*)?$/.test(e.request.url);
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(function (hit) {
+    caches.match(e.request, { ignoreSearch: isPage }).then(function (hit) {
       return hit || fetch(e.request).then(function (res) {
         // cache new same-origin responses opportunistically
         if (res.ok && e.request.url.indexOf(self.location.origin) === 0) {

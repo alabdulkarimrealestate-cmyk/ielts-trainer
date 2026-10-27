@@ -27,6 +27,7 @@ window.registerModule = function (m) { window.MODULES.push(m); };
   var base = "data/modules/";
   window.MODULE_FILES.forEach(function (f) {
     /* eslint-disable-next-line no-document-write */
-    document.write('<script src="' + base + f + '"><\/script>');
+    var v = window.ASSET_VERSION ? "?v=" + window.ASSET_VERSION : "";   // cache-busting stamp (see bump.js)
+    document.write('<script src="' + base + f + v + '"><\/script>');
   });
 })();
