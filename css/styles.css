@@ -518,3 +518,5 @@ h1,h2,h3{margin:0 0 .4em}
 .chat-fallback{margin-top:6px}
 .chat-transcript{display:flex; flex-direction:column; gap:6px; margin:6px 0 10px}
 .chat-transcript .msg{font-size:13px; max-width:95%}
+
+.pb-note-dark{font-size:12px; color:var(--warn); margin:6px 0; line-height:1.7}

@@ -349,6 +349,7 @@
       steps.appendChild(el("div", null, "٢. (يُنصح) قيّد المفتاح في Google Cloud: Application restrictions ← Websites ← أضف عنوان التطبيق."));
       steps.appendChild(el("div", null, "٣. الصق المفتاح هنا واضغط «اختبر وفعّل»."));
       box.appendChild(steps);
+      steps.appendChild(el("div", "pb-note-dark", "ℹ هذا مفتاح Google Gemini (يبدأ بـ AIza) — وليس توكن GitHub الذي في تبويب «البيانات» للمزامنة."));
       var keyIn = el("input", "reason ltr"); keyIn.type = "password"; keyIn.placeholder = "AIza…"; keyIn.autocomplete = "off";
       box.appendChild(keyIn);
       var en = btn("اختبر المفتاح وفعّل", "primary wide", function () {

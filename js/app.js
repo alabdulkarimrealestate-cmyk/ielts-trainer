@@ -512,7 +512,10 @@
 
     /* ---- auto-sync (GitHub Gist) ---- */
     var syncBox = el("div", "sync-box");
-    syncBox.appendChild(el("h3", "grp-title", "☁ المزامنة التلقائية بين الأجهزة"));
+    syncBox.appendChild(el("h3", "grp-title", "☁ المزامنة التلقائية بين الأجهزة (توكن GitHub)"));
+    var notGemini = el("div", "export-reminder", "⚠ هذا الصندوق لتوكن GitHub الخاص بالمزامنة فقط — مفتاح Gemini (AIza…) مكانه في تبويب «الخطة» ▸ الذكاء الاصطناعي. اضغط هنا للانتقال.");
+    notGemini.onclick = function () { go("plan"); };
+    syncBox.appendChild(notGemini);
 
     var statusLine = el("div", "sync-status");
     function paintStatus() {
