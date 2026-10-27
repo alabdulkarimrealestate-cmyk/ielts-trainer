@@ -16,7 +16,8 @@ window.MODULE_FILES = [
   "copula_agreement.js",
   "reversal_pairs.js",
   "phonetics.js",
-  "collocations.js"
+  "collocations.js",
+  "vocab_awl.js"
 ];
 
 window.MODULES = [];
