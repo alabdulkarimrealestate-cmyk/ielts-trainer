@@ -12,37 +12,32 @@
   }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 
-  var ROUTES = [
-    { id:"home",       label:"الرئيسية",     icon:"🏠" },
-    { id:"roadmap",    label:"الخريطة",      icon:"🗺️" },
-    { id:"dashboard",  label:"لوحة التقدّم",  icon:"📊" },
+  // Nav: the exam-prep routes (views_prep.js) come first; the drill-engine
+  // extras (translate, dictionary, reference, diagrams, data, roadmap, load)
+  // live under "more" so the bar stays short on a phone.
+  var ROUTES = (window.EXTRA_ROUTES || []).length ? window.EXTRA_ROUTES : [
+    { id:"today",      label:"اليوم",        icon:"📅" },
     { id:"practice",   label:"تدرّب",         icon:"🎯" },
-    { id:"writing",    label:"فحص الكتابة",   icon:"✍️" },
-    { id:"translate",  label:"ترجمة",         icon:"🌐" },
-    { id:"dictionary", label:"قاموس النطق",   icon:"🔊" },
-    { id:"reference",  label:"مرجع المتلازمات", icon:"📚" },
-    { id:"diagrams",   label:"رسوم توضيحية",  icon:"🖼️" },
+    { id:"dashboard",  label:"لوحة القواعد",  icon:"📊" },
     { id:"data",       label:"البيانات",      icon:"💾" }
   ];
+  var MORE_ROUTES = { load:1, roadmap:1, dictionary:1, reference:1, diagrams:1, translate:1, data:1 };
 
-  var currentRoute = "home";
+  var currentRoute = "today";
 
   function go(route, arg) {
     currentRoute = route;
     window.scrollTo(0, 0);
     clear(view);
-    (VIEWS[route] || VIEWS.home)(arg);
+    (VIEWS[route] || VIEWS.today)(arg);
+    var navId = (route === "session") ? "practice" : (MORE_ROUTES[route] ? "more" : route);
     Array.prototype.forEach.call(nav.children, function (b) {
-      b.classList.toggle("active", b.dataset.route === route);
+      b.classList.toggle("active", b.dataset.route === navId);
     });
   }
 
-  /* ---------------- HOME ---------------- */
-  function homeView() {
-    var wrap = el("div", "page");
-    wrap.appendChild(el("h1", "hero-title", "مدرّب القواعد والنطق — IELTS"));
-    wrap.appendChild(el("p", "hero-sub", "١٥ دقيقة يوميًا. فكّر قبل أن تكشف الإجابة. تقدّمك يُحفظ تلقائيًا."));
-
+  /* ---------------- HOME WIDGETS (reused by the Today view) ---------------- */
+  function homeWidgets(wrap) {
     var startCard = el("div", "start-card");
     var big = el("button", "btn primary huge", "▶  ابدأ جلسة ١٥ دقيقة");
     big.onclick = function () { go("session"); };
@@ -93,17 +88,7 @@
       wrap.appendChild(wbox);
     }
 
-    var grid = el("div", "quick-grid");
-    [["dashboard","📊","لوحة التقدّم"],["practice","🎯","تدرّب على قاعدة"],
-     ["writing","✍️","فحص الكتابة"],["dictionary","🔊","قاموس النطق"]].forEach(function (q) {
-      var c = el("button", "quick", q[1] + "\n" + q[2]);
-      c.onclick = function () { go(q[0]); };
-      grid.appendChild(c);
-    });
-    wrap.appendChild(grid);
-
     wrap.appendChild(el("div", "streak-inline", "🔥 " + Store.globalStreak() + " أيام متتالية"));
-    view.appendChild(wrap);
   }
 
   /* ---------------- SESSION (15-min mixed) ---------------- */
@@ -320,51 +305,7 @@
     view.appendChild(wrap);
   }
 
-  /* ---------------- WRITING CHECK ---------------- */
-  function writingView() {
-    var wrap = el("div", "page");
-    wrap.appendChild(el("h2", "page-title", "الكتابة (بدون تكلفة)"));
-
-    /* -- Task 2 prompt generator: general topics ONLY (no finance —
-          specialist vocabulary inflates Lexical Resource and masks range) -- */
-    var promptCard = el("div", "wp-card");
-    promptCard.appendChild(el("h3", "grp-title", "١ · موضوع Task 2 عشوائي"));
-    var promptBox = el("div", "wp-text ltr hidden");
-    var genPrompt = el("button", "btn wide", "🎲 أعطني موضوعًا (عام — بلا مالية)");
-    var currentPrompt = null;
-    genPrompt.onclick = function () {
-      var bank = window.WRITING_PROMPTS || [];
-      if (!bank.length) return;
-      var pick = bank[Math.floor(Math.random() * bank.length)];
-      currentPrompt = pick;
-      promptBox.textContent = pick.text;
-      promptBox.classList.remove("hidden");
-      genPrompt.textContent = "🎲 موضوع آخر";
-    };
-    promptCard.appendChild(genPrompt);
-    promptCard.appendChild(promptBox);
-    wrap.appendChild(promptCard);
-
-    /* -- essay + evaluation assembler -- */
-    wrap.appendChild(el("h3", "grp-title", "٢ · الصق مقالك"));
-    wrap.appendChild(el("p", "muted-p",
-      "اكتب في التطبيق أو على الورق ثم انقله هنا. يولّد التطبيق برومبت تقييم كاملًا (المعايير الأربعة + قائمة مراقبتك الحالية + مرحلتك) تلصقه في Claude. التطبيق لا يُقيّم بنفسه."));
-    var ta = el("textarea", "big-input ltr");
-    ta.rows = 10; ta.placeholder = "Paste your essay or paragraph here...";
-    wrap.appendChild(ta);
-    var gen = el("button", "btn primary wide", "أنشئ برومبت التقييم وانسخه");
-    var out = el("textarea", "prompt-out ltr hidden"); out.rows = 10; out.readOnly = true;
-    gen.onclick = function () {
-      if (!ta.value.trim()) { ta.focus(); return; }
-      var p = window.Prompts.writing(ta.value.trim(), currentPrompt ? currentPrompt.text : null);
-      out.value = p; out.classList.remove("hidden");
-      window.Prompts.copy(p, gen);
-    };
-    wrap.appendChild(gen);
-    wrap.appendChild(el("div", "hint-line", "الخطوة التالية: افتح Claude، الصق، أرسل. سيعطيك درجة لكل معيار + وسم كل خطأ بأنماط قائمة مراقبتك."));
-    wrap.appendChild(out);
-    view.appendChild(wrap);
-  }
+  /* ---------------- WRITING: lives in views_prep.js (Task 1/2, timer, checklist, AI/paste/manual) ---------------- */
 
   /* ---------------- TRANSLATE (selected text) ---------------- */
   function translateView(prefill) {
@@ -754,12 +695,15 @@
   }
 
   var VIEWS = {
-    home: homeView, session: sessionView, load: loadSessionView,
+    session: sessionView, load: loadSessionView,
     roadmap: roadmapView, practice: practiceView,
-    dashboard: dashboardView, writing: writingView, translate: translateView,
+    dashboard: dashboardView, translate: translateView,
     dictionary: dictionaryView, reference: referenceView,
     diagrams: diagramsView, data: dataView
   };
+  // exam-prep views (today, plan, log, writing, progress, report, more)
+  Object.keys(window.EXTRA_VIEWS || {}).forEach(function (k) { VIEWS[k] = window.EXTRA_VIEWS[k]; });
+  if (!VIEWS.today) VIEWS.today = practiceView;
 
   /* ---------------- selection -> translate floating button ---------------- */
   function selectedText() {
@@ -782,7 +726,7 @@
   function boot() {
     var root = document.getElementById("app");
     var header = el("header", "topbar");
-    header.innerHTML = '<div class="brand">ميزان <span>IELTS</span></div>';
+    header.innerHTML = '<div class="brand">IELTS 7.0 <span>خطة ومدرّب</span></div>';
     nav = el("nav", "mainnav");
     ROUTES.forEach(function (r) {
       var b = el("button", "navbtn", r.icon + " " + r.label);
@@ -807,10 +751,13 @@
     document.addEventListener("mouseup", function () { setTimeout(updateFloat, 10); });
     document.addEventListener("selectionchange", function () { setTimeout(updateFloat, 10); });
 
-    go("home");
+    go("today");
   }
 
-  window.App = { go: go, startRule: startRule, current: function () { return currentRoute; } };
+  window.App = {
+    go: go, startRule: startRule, current: function () { return currentRoute; },
+    view: function () { return view; }, homeWidgets: homeWidgets, escapeHtml: escapeHtml
+  };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else { boot(); }
