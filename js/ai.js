@@ -9,8 +9,23 @@
   var BASE = "https://generativelanguage.googleapis.com/v1beta";
   var DEFAULT_MODEL = "gemini-2.5-flash";
   // Free-tier quotas are PER MODEL: when one is exhausted (429) the next is tried.
-  var STATIC_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.0-flash-lite"];
-  var PREFER = [/2\.5-flash-lite/, /2\.5-flash(?!-lite)/, /2\.0-flash-lite/, /2\.0-flash/, /flash-latest/, /flash/, /pro/];
+  var STATIC_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.0-flash"];
+  // Only plain text chat models: no TTS / image / transcription / robotics /
+  // computer-use / preview codenames. Ranked lite-flash newest first (roomiest
+  // free tier), then flash, then pro.
+  var EXCLUDE = /tts|image|transcribe|robotics|computer-use|banana|argon|omni|customtools|embedding|aqa|learnlm|gemma/i;
+  function rankKey(m) {
+    if (!/^gemini-/.test(m) || EXCLUDE.test(m)) return null;
+    var tier = /lite/.test(m) ? 0 : /flash/.test(m) ? 1 : /pro/.test(m) ? 2 : 3;
+    var ver = parseFloat((m.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+    if (/latest/.test(m)) ver = 99;                       // rolling alias = newest
+    if (/preview|exp/.test(m)) ver -= 0.05;               // stable before preview of the same version
+    return tier * 1000 + (100 - ver);
+  }
+  function rankModels(names) {
+    return (names || []).filter(function (m) { return rankKey(m) !== null; })
+      .sort(function (a, b) { return rankKey(a) - rankKey(b); });
+  }
 
   function loadCfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) { return {}; }
@@ -88,11 +103,7 @@
       var names = ((data && data.models) || []).filter(function (m) {
         return (m.supportedGenerationMethods || []).indexOf("generateContent") !== -1 && /gemini/i.test(m.name || "");
       }).map(function (m) { return String(m.name).replace(/^models\//, ""); });
-      names.sort(function (a, b) {
-        var pa = /flash/.test(a) ? 0 : 1, pb = /flash/.test(b) ? 0 : 1;   // flash first (free-tier friendly)
-        return pa !== pb ? pa - pb : (a < b ? 1 : -1);
-      });
-      return names;
+      return rankModels(names);
     });
   }
 
@@ -135,10 +146,7 @@
   // Preferred model first, then the key's other models in a sensible order
   // (lite flash models have the roomiest free tiers), then static names.
   function modelCandidates() {
-    var known = (cfg.models || []).slice();
-    var ordered = [];
-    PREFER.forEach(function (re) { known.forEach(function (m) { if (re.test(m) && ordered.indexOf(m) === -1) ordered.push(m); }); });
-    var candidates = [model()].concat(ordered, STATIC_FALLBACKS);
+    var candidates = [model()].concat(rankModels(cfg.models || []), STATIC_FALLBACKS);
     var seen = {};
     return candidates.filter(function (m) { if (!m || seen[m]) return false; seen[m] = 1; return true; });
   }

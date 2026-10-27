@@ -1,6 +1,6 @@
 /* sw.js — offline cache for the whole app (cache-first).
    Bump CACHE_VERSION whenever you edit any file so devices pick up changes. */
-var CACHE_VERSION = "ielts-trainer-v9";
+var CACHE_VERSION = "ielts-trainer-v10";
 
 var ASSETS = [
   "./",
