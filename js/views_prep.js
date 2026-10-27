@@ -671,6 +671,13 @@
     ta.oninput = function () { var n = ta.value.trim().split(/\s+/).filter(Boolean).length; wc.textContent = n + " كلمة" + (n < (state.task === 1 ? 150 : 250) ? " (أقل من الحد)" : " ✓"); };
     ec.appendChild(ta); ec.appendChild(wc);
     wrap.appendChild(ec);
+    // the floating coach reads the live draft (only while this screen is on)
+    window.WritingDraft = { get: function () {
+      if (!ta.isConnected) return null;
+      var essay = ta.value.trim(), p = promptText();
+      if (!essay && !p) return null;
+      return { task: state.task, prompt: p || "", essay: essay, words: essay ? essay.split(/\s+/).length : 0 };
+    } };
 
     // 3 · checklist gate
     var cc = card("٣ · قبل التسليم (فخاخ متحدث العربية)");
@@ -935,7 +942,8 @@
     var wrap = el("div", "page");
     wrap.appendChild(el("h2", "page-title", "المزيد"));
     var grid = el("div", "quick-grid");
-    [["load", "⚡", "جلسة تحت الضغط"], ["roadmap", "🗺️", "خريطة القواعد"], ["dictionary", "🔊", "قاموس النطق"], ["reference", "📚", "مرجع المتلازمات"],
+    [["dashboard", "📊", "لوحة القواعد"], ["plan", "🗓️", "الخطة والإعدادات"], ["report", "🤖", "تقرير AI الأسبوعي"],
+     ["load", "⚡", "جلسة تحت الضغط"], ["roadmap", "🗺️", "خريطة القواعد"], ["dictionary", "🔊", "قاموس النطق"], ["reference", "📚", "مرجع المتلازمات"],
      ["diagrams", "🖼️", "رسوم توضيحية"], ["translate", "🌐", "ترجمة"], ["data", "💾", "البيانات والمزامنة"]].forEach(function (q) {
       var b = el("button", "quick", q[1] + "\n" + q[2]); b.type = "button"; b.onclick = function () { go(q[0]); }; grid.appendChild(b);
     });

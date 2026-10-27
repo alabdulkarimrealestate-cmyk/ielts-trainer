@@ -1,4 +1,5 @@
-/* chat.js — in-page Socratic error chat with Gemini: text + voice.
+/* chat.js — in-page chat with Gemini: text + voice. Used by (a) the Socratic
+   error chat under a wrong answer and (b) the floating coach (assistant.js).
    Voice is the browser's own Web Speech API — dictation (SpeechRecognition:
    Chrome / Edge / Android, needs HTTPS) and read-aloud (speechSynthesis, the
    Arabic and English parts of a reply spoken by matching voices). Nothing is
@@ -63,11 +64,13 @@
   }
   function stopSpeaking() { if (TTS) { try { TTS.cancel(); } catch (e) {} } }
 
-  /* ---------------- widget ---------------- */
-  // opts: { title, system, opening, item, fallbackPrompt, onClose }
+  /* ---------------- widget ----------------
+     opts: { title, system (string | function), opening (hidden first turn),
+             greeting (shown, not sent), quickPrompts (array | function),
+             item, ruleTag, fallbackPrompt, persistent, onClose }            */
   function open(host, opts) {
     opts = opts || {};
-    if (active) active.close();
+    if (active && !active.persistent) active.close();
     var vs = voiceSettings();
     var history = [], record = null, busy = false, rec = null, listening = false, closed = false;
 
@@ -93,24 +96,31 @@
 
     var msgs = el("div", "chat-msgs"); panel.appendChild(msgs);
     var status = el("div", "chat-status"); panel.appendChild(status);
+    var quick = el("div", "quick-chips"); panel.appendChild(quick);
 
     var row = el("div", "chat-input-row");
     var mic = el("button", "btn mic-btn", "🎙"); mic.type = "button";
     var input = el("textarea", "chat-input"); input.rows = 2; input.dir = "auto";
-    input.placeholder = SR ? "اكتب ردّك… أو اضغط 🎙 وتكلّم" : "اكتب ردّك…";
+    input.placeholder = SR ? "اكتب… أو اضغط 🎙 وتكلّم" : "اكتب…";
     var send = el("button", "btn primary send-btn", "أرسل"); send.type = "button";
     row.appendChild(mic); row.appendChild(input); row.appendChild(send); panel.appendChild(row);
     if (!SR) { mic.disabled = true; mic.title = "الإملاء الصوتي غير مدعوم في هذا المتصفّح"; panel.appendChild(el("div", "chat-hint", "الإملاء الصوتي يعمل في Chrome / Edge (وأندرويد) عبر HTTPS. القراءة بصوت عالٍ تعمل في معظم المتصفّحات.")); }
 
     var fallback = el("div", "chat-fallback hidden");
-    var cp = el("button", "btn small", "انسخ الحوار لـ Claude بدلًا من ذلك"); cp.type = "button";
-    cp.onclick = function () { if (opts.fallbackPrompt) window.Prompts.copy(opts.fallbackPrompt, cp); };
-    fallback.appendChild(cp); panel.appendChild(fallback);
+    if (opts.fallbackPrompt) {
+      var cp = el("button", "btn small", "انسخ الحوار لـ Claude بدلًا من ذلك"); cp.type = "button";
+      cp.onclick = function () { window.Prompts.copy(opts.fallbackPrompt, cp); };
+      fallback.appendChild(cp);
+    }
+    panel.appendChild(fallback);
 
     var foot = el("div", "chat-foot");
     var stopB = el("button", "btn small", "⏹ أوقف الصوت"); stopB.type = "button"; stopB.onclick = function () { stopSpeaking(); stopListening(); };
-    var endB = el("button", "btn small ghost", "إنهاء الحوار"); endB.type = "button"; endB.onclick = function () { close(); host.innerHTML = ""; if (opts.onClose) opts.onClose(); };
-    foot.appendChild(stopB); foot.appendChild(endB); panel.appendChild(foot);
+    var newB = el("button", "btn small ghost", "محادثة جديدة"); newB.type = "button";
+    newB.onclick = function () { stopAudio(); history = []; record = null; msgs.innerHTML = ""; if (opts.greeting) addMsg("model", opts.greeting); refreshQuick(); };
+    var endB = el("button", "btn small ghost", opts.persistent ? "إغلاق" : "إنهاء الحوار"); endB.type = "button";
+    endB.onclick = function () { if (opts.persistent) { if (opts.onClose) opts.onClose(); } else { close(); host.innerHTML = ""; if (opts.onClose) opts.onClose(); } };
+    foot.appendChild(stopB); if (opts.persistent) foot.appendChild(newB); foot.appendChild(endB); panel.appendChild(foot);
     host.appendChild(panel);
 
     function addMsg(role, text) {
@@ -118,9 +128,20 @@
       msgs.appendChild(m); msgs.scrollTop = msgs.scrollHeight; return m;
     }
     function setBusy(b) { busy = b; send.disabled = b; mic.disabled = b || !SR; status.textContent = b ? "… يفكّر" : ""; }
+    function refreshQuick() {
+      quick.innerHTML = "";
+      var list = typeof opts.quickPrompts === "function" ? opts.quickPrompts() : (opts.quickPrompts || []);
+      (list || []).forEach(function (q) {
+        var c = el("button", "quick-chip", q); c.type = "button";
+        c.onclick = function () { if (busy) return; ask(q); };
+        quick.appendChild(c);
+      });
+      quick.classList.toggle("hidden", !(list && list.length));
+    }
     function persist() {
-      var messages = history.slice(1, 1 + 40);   // skip the hidden opening context
-      if (!record) record = Store.addChat({ itemId: opts.item && opts.item.id, rule: opts.item && opts.item.rule, title: opts.title || "", messages: messages });
+      var messages = (opts.opening ? history.slice(1) : history.slice()).slice(-40);
+      var rule = opts.ruleTag || (opts.item && opts.item.rule) || "chat";
+      if (!record) record = Store.addChat({ itemId: opts.item && opts.item.id, rule: rule, title: opts.title || "", messages: messages });
       else Store.updateChat(record.id, { messages: messages });
     }
     function ask(userText, hidden) {
@@ -130,7 +151,8 @@
       history.push({ role: "user", text: userText });
       var typing = addMsg("model typing", "…");
       setBusy(true);
-      AI.chat(history, opts.system).then(function (reply) {
+      var sys = typeof opts.system === "function" ? opts.system() : opts.system;
+      AI.chat(history, sys).then(function (reply) {
         if (closed) return;
         typing.classList.remove("typing"); typing.textContent = reply;
         history.push({ role: "model", text: reply });
@@ -138,9 +160,9 @@
         if (vs.autoSpeak) speak(reply, function () { if (vs.handsFree && !busy && !closed) startListening(); });
         else if (vs.handsFree) startListening();
       }).catch(function (e) {
-        typing.remove(); setBusy(false);
+        typing.remove(); history.pop(); setBusy(false);
         status.textContent = "⚠ " + ((e && (e.ar || e.message)) || "خطأ");
-        fallback.classList.remove("hidden");
+        if (opts.fallbackPrompt) fallback.classList.remove("hidden");
       });
     }
     function sendInput() { var t = input.value.trim(); if (!t) return; input.value = ""; ask(t); }
@@ -181,10 +203,13 @@
     function stopListening() { if (rec && listening) { try { rec.stop(); } catch (e) {} } }
     mic.onclick = function () { if (listening) stopListening(); else startListening(); };
 
-    function close() { closed = true; stopListening(); stopSpeaking(); if (active === api) active = null; }
-    var api = { close: close, ask: ask };
+    function stopAudio() { stopListening(); stopSpeaking(); }
+    function close() { closed = true; stopAudio(); if (active === api) active = null; }
+    var api = { close: close, ask: ask, stopAudio: stopAudio, refreshQuick: refreshQuick, persistent: !!opts.persistent, focus: function () { input.focus(); } };
     active = api;
 
+    if (opts.greeting) addMsg("model", opts.greeting);
+    refreshQuick();
     if (opts.opening) ask(opts.opening, true);
     return api;
   }
@@ -201,7 +226,9 @@
     });
   }
 
-  function stopActive() { if (active) active.close(); }
+  // Called on every screen change: inline chats close (their DOM is gone);
+  // the persistent coach drawer only goes quiet.
+  function stopActive() { if (!active) return; if (active.persistent) active.stopAudio(); else active.close(); }
 
   window.Chat = { open: open, openForError: openForError, speak: speak, stop: stopSpeaking, stopActive: stopActive,
                   supported: { stt: !!SR, tts: !!TTS } };

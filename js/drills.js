@@ -155,9 +155,10 @@
 
     // reasoning
     var rLabel = el("label", "reason-label", "لماذا هذه الإجابة؟ (إلزامي قبل الكشف)");
-    var reason = el("textarea", "reason ltr");
-    reason.rows = 2;
-    reason.placeholder = "Write one line: why this answer?";
+    var reason = el("textarea", "reason");
+    reason.rows = 2; reason.dir = "auto";
+    reason.placeholder = "سطر واحد: لماذا هذه الإجابة؟ (عربي أو English)";
+    window.Drills.lastRevealed = null;
     reason.oninput = refresh;
     card.appendChild(rLabel);
     card.appendChild(reason);
@@ -185,6 +186,9 @@
       revealBtn.classList.add("hidden");
 
       Store.record(item, correct, ctrl.answerText(), reason.value.trim(), opts.mode || "calm");
+      // the floating coach (assistant.js) reads this to talk about the item on screen
+      window.Drills.lastRevealed = { item: item, answer: ctrl.answerText(), reasoning: reason.value.trim(), correct: correct,
+                                     visible: function () { return card.isConnected; } };
 
       feedback.classList.remove("hidden");
       feedback.classList.add(correct ? "ok" : "bad");
@@ -251,5 +255,5 @@
     return item.correct_answer;
   }
 
-  window.Drills = { render: render, shuffle: shuffle };
+  window.Drills = { render: render, shuffle: shuffle, lastRevealed: null };
 })();

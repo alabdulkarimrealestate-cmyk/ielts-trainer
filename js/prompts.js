@@ -462,6 +462,7 @@ topic
     errorChat: errorChat,
     errorChatSystem: errorChatSystem,
     errorChatOpening: errorChatOpening,
+    describeItem: describeItem,
     copy: copy
   };
 })();

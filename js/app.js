@@ -32,8 +32,12 @@
     clear(view);
     (VIEWS[route] || VIEWS.today)(arg);
     var navId = (route === "session") ? "practice" : (MORE_ROUTES[route] ? "more" : route);
-    Array.prototype.forEach.call(nav.children, function (b) {
+    var bottomId = { dashboard: "more", plan: "more", report: "more" }[navId] || navId;
+    Array.prototype.forEach.call(document.querySelectorAll(".navbtn[data-route]"), function (b) {
       b.classList.toggle("active", b.dataset.route === navId);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".navbtn-b[data-route]"), function (b) {
+      b.classList.toggle("active", b.dataset.route === bottomId);
     });
   }
 
@@ -758,6 +762,21 @@
     root.appendChild(nav);
     root.appendChild(view);
     document.body.appendChild(floatBtn);
+
+    // phone: bottom tab bar (CSS shows it ≤640px and hides the chip nav)
+    var bottom = el("nav", "bottombar");
+    [["today", "📅", "اليوم"], ["practice", "🎯", "تدرّب"], ["writing", "✍️", "الكتابة"], ["log", "📝", "سجّل"],
+     ["progress", "📈", "التقدّم"], ["more", "⋯", "المزيد"]].forEach(function (r) {
+      var b = el("button", "navbtn-b");
+      b.type = "button"; b.dataset.route = r[0];
+      b.appendChild(el("span", "ic", r[1])); b.appendChild(el("span", "lb", r[2]));
+      b.onclick = function () { go(r[0]); };
+      bottom.appendChild(b);
+    });
+    document.body.appendChild(bottom);
+
+    // the floating Gemini coach, on every screen
+    if (window.Assistant) window.Assistant.init();
 
     document.addEventListener("mouseup", function () { setTimeout(updateFloat, 10); });
     document.addEventListener("selectionchange", function () { setTimeout(updateFloat, 10); });

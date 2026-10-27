@@ -518,5 +518,59 @@ h1,h2,h3{margin:0 0 .4em}
 .chat-fallback{margin-top:6px}
 .chat-transcript{display:flex; flex-direction:column; gap:6px; margin:6px 0 10px}
 .chat-transcript .msg{font-size:13px; max-width:95%}
+.quick-chips{display:flex; gap:6px; overflow-x:auto; padding:2px 0 8px; scrollbar-width:none}
+.quick-chips::-webkit-scrollbar{height:0}
+.quick-chip{flex:0 0 auto; border:1px solid var(--accent); color:var(--accent); background:transparent; border-radius:999px; padding:6px 12px; font-size:12px; font-family:inherit; cursor:pointer; white-space:nowrap}
+.quick-chip:hover{background:rgba(15,118,110,.08)}
+.reason[dir="auto"]{text-align:start}
+
+/* ---- floating Gemini coach (assistant.js) ---- */
+.fab-gemini{position:fixed; inset-inline-end:16px; bottom:20px; z-index:41; width:56px; height:56px; border-radius:50%;
+  border:none; background:var(--accent); color:#fff; font-size:26px; line-height:1; cursor:pointer;
+  box-shadow:0 8px 22px rgba(15,118,110,.45); transition:.15s}
+.fab-gemini:hover{background:var(--accent-2)}
+.fab-gemini.open{background:var(--accent-2); font-size:22px}
+.chat-drawer{position:fixed; inset-inline-end:16px; bottom:86px; width:min(440px, calc(100vw - 32px)); height:min(620px, 72vh); z-index:40;
+  background:var(--card); border:1px solid var(--accent); border-radius:16px; box-shadow:0 14px 44px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; overflow:hidden}
+.drawer-head{display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:var(--accent); color:#fff; font-weight:700; flex:0 0 auto}
+.drawer-close{background:none; border:none; color:#fff; font-size:20px; cursor:pointer; padding:0 4px}
+.drawer-body{flex:1; min-height:0; display:flex; flex-direction:column}
+.drawer-body .chat-panel{border:none; margin:0; padding:8px 10px; flex:1; min-height:0; display:flex; flex-direction:column; border-radius:0}
+.drawer-body .chat-head{flex:0 0 auto}
+.drawer-body .chat-msgs{flex:1; min-height:0; max-height:none}
+.drawer-body .chat-status,.drawer-body .quick-chips,.drawer-body .chat-input-row,.drawer-body .chat-foot,.drawer-body .chat-fallback,.drawer-body .chat-hint{flex:0 0 auto}
+.chat-notice{padding:16px}
+
+/* ---- phone layout: bottom tab bar, compact header, bigger targets ---- */
+.bottombar{display:none}
+@media (max-width:640px){
+  .mainnav{display:none}
+  .topbar{padding:8px 14px}
+  .brand{font-size:17px}
+  .bottombar{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:35; background:var(--card); border-top:1px solid var(--line);
+    padding:5px 2px calc(5px + env(safe-area-inset-bottom)); justify-content:space-around; box-shadow:0 -4px 14px rgba(0,0,0,.08)}
+  .navbtn-b{flex:1; border:none; background:none; color:var(--muted); font-family:inherit; font-size:11px; display:flex; flex-direction:column; align-items:center; gap:1px; padding:4px 0; min-height:48px; cursor:pointer}
+  .navbtn-b .ic{font-size:21px; line-height:1.1}
+  .navbtn-b.active{color:var(--accent); font-weight:700}
+  #app{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+  .view{padding:12px}
+  .float-translate{bottom:calc(76px + env(safe-area-inset-bottom)); padding:10px 14px; font-size:13px}
+  .fab-gemini{bottom:calc(74px + env(safe-area-inset-bottom)); width:52px; height:52px}
+  .chat-drawer{inset-inline-end:0; inset-inline-start:0; bottom:0; width:auto; height:min(640px, 82vh); border-radius:18px 18px 0 0; border-bottom:none;
+    padding-bottom:env(safe-area-inset-bottom)}
+  .btn{min-height:44px}
+  .btn.small{min-height:40px}
+  .opt,.tok{min-height:48px}
+  .navbtn{min-height:40px}
+  .task-row{padding:9px 10px; gap:8px}
+  .task-act{padding:9px 11px}
+  .phase-banner{padding:14px}
+  .pb-name{font-size:18px}
+  .hero-title{font-size:20px}
+  .q-sentence{font-size:19px}
+  .chat-input{font-size:16px}   /* ≥16px stops iOS zooming into the field */
+  .big-input,.text-input,.reason{font-size:16px}
+}
 
 .pb-note-dark{font-size:12px; color:var(--warn); margin:6px 0; line-height:1.7}
