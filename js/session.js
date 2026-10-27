@@ -29,12 +29,15 @@
     var perRule = {};                 // ruleId -> { n, c }
     var timeLeft = opts.countdownSeconds || 0;
     var timer = null, timedOut = false;
+    var startedAt = new Date().toISOString(), t0 = Date.now();
 
     function summaryObj() {
       return {
         total: queue.length, answered: idx, correct: correct,
         perRule: perRule, mode: mode, timedOut: timedOut,
-        kind: opts.kind || (mode === "load" ? "load_session" : "session")
+        kind: opts.kind || (mode === "load" ? "load_session" : "session"),
+        startedAt: startedAt,
+        seconds: Math.round((Date.now() - t0) / 1000)   // drill time counts toward logged study hours
       };
     }
 

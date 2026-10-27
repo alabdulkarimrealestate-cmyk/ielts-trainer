@@ -1,4 +1,7 @@
-/* storage.js — localStorage persistence: per-rule stats + full answer/reasoning log */
+/* storage.js — localStorage persistence: per-rule stats + full answer/reasoning log
+   + exam-prep records: daily tasks, practice tests, writings, speaking sessions,
+   AI reports, user-added vocabulary, and plan settings (exam date, hours…).
+   Every new collection here must also be merged in sync.js (mergeStates). */
 (function () {
   "use strict";
   var KEY = "ielts_trainer_v1";
@@ -13,9 +16,18 @@
   function daysBetween(a, b) {
     return Math.round((new Date(b) - new Date(a)) / 86400000);
   }
+  function genId(prefix) {
+    return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+  }
+
+  // size caps — the whole state is pushed to a Gist (truncated above ~1 MB)
+  var CAPS = { log: 5000, sessions: 200, exams: 500, writings: 100, speaking: 300, reports: 60, essayChars: 2500 };
 
   function blankRule() {
     return { attempts: 0, correct: 0, streak: 0, lastPracticed: null, recent: [] };
+  }
+  function blankPlan() {
+    return { examDate: null, hours: {}, ruleWeights: {}, diagnosticDone: false };
   }
 
   function fresh() {
@@ -24,7 +36,15 @@
       leitner: {},           // itemId -> { box: 1..5, due: "YYYY-MM-DD" }
       stageStatus: {},       // stageId -> user-confirmed status override
       settings: { sessionMinutes: 15, loadItems: 10, loadSeconds: 300 },
-      lastExport: null
+      lastExport: null,
+      // ---- exam-prep layer ----
+      tasks: {},             // "YYYY-MM-DD|taskId" | "diagnostic|taskId" -> { done, minutes, ts, note }
+      exams: [],             // practice tests: { id, ts, date, skill, raw, total, band, source, ... }
+      writings: [],          // essays + evaluations
+      speaking: [],          // tutor / self / AI-transcript sessions
+      reports: [],           // weekly AI reports
+      addedVocab: [],        // drill items (rule "vocab_awl") added from evaluations
+      plan: blankPlan()
     };
     (window.RULES || []).forEach(function (r) { s.rules[r.id] = blankRule(); });
     return s;
@@ -36,6 +56,12 @@
     if (!s.stageStatus) s.stageStatus = {};
     if (!s.settings) s.settings = { sessionMinutes: 15, loadItems: 10, loadSeconds: 300 };
     if (!("lastExport" in s)) s.lastExport = null;
+    ["log", "sessions", "addedDict", "addedPairs", "exams", "writings", "speaking", "reports", "addedVocab"]
+      .forEach(function (k) { if (!Array.isArray(s[k])) s[k] = []; });
+    if (!s.tasks || typeof s.tasks !== "object") s.tasks = {};
+    s.plan = Object.assign(blankPlan(), s.plan || {});
+    if (!s.plan.hours || typeof s.plan.hours !== "object") s.plan.hours = {};
+    if (!s.plan.ruleWeights || typeof s.plan.ruleWeights !== "object") s.plan.ruleWeights = {};
     s.log.forEach(function (e) { if (!e.mode) e.mode = "calm"; });
     s.sessions.forEach(function (e) { if (!e.mode) e.mode = "calm"; });
     return s;
@@ -51,20 +77,51 @@
     (window.RULES || []).forEach(function (r) {
       if (!s.rules[r.id]) s.rules[r.id] = blankRule();
     });
-    if (!s.log) s.log = [];
-    if (!s.sessions) s.sessions = [];
-    if (!s.addedDict) s.addedDict = [];
-    if (!s.addedPairs) s.addedPairs = [];
     return upgrade(s);
   }
 
   var state = load();
+
+  // User-added drill items (confusable pairs, vocabulary from evaluations) must
+  // be drillable after a reload AND after a sync merge — config.js only knows
+  // the bundled banks. Called on load, import, add and reset.
+  function syncUserItems() {
+    var all = window.ALL_ITEMS;
+    if (!all) return;
+    var have = {};
+    all.forEach(function (i) { if (i && i.id) have[i.id] = true; });
+    (state.addedPairs || []).concat(state.addedVocab || []).forEach(function (it) {
+      if (it && it.id && !have[it.id]) { all.push(it); have[it.id] = true; }
+    });
+  }
+  function removeUserItems() {
+    var all = window.ALL_ITEMS;
+    if (!all) return;
+    var ids = {};
+    (state.addedPairs || []).concat(state.addedVocab || []).forEach(function (it) { if (it && it.id) ids[it.id] = true; });
+    for (var i = all.length - 1; i >= 0; i--) if (all[i] && ids[all[i].id]) all.splice(i, 1);
+  }
+  syncUserItems();
+
+  function cap(list, n) { if (list.length > n) list.splice(0, list.length - n); }
 
   function save() {
     state.updatedAt = new Date().toISOString();
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
     // notify sync layer (set by sync.js) — never let it break a save
     try { if (Store.onChange) Store.onChange(); } catch (e) {}
+  }
+
+  function stamp(obj) {
+    return Object.assign({ ts: new Date().toISOString(), date: todayStr() }, obj);
+  }
+  function findById(list, id) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+  function removeById(list, id) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) { list.splice(i, 1); return true; }
+    return false;
   }
 
   var Store = {
@@ -108,7 +165,7 @@
         reasoning: reasoning || "",
         correct: !!isCorrect
       });
-      if (state.log.length > 5000) state.log = state.log.slice(-5000);
+      if (state.log.length > CAPS.log) state.log = state.log.slice(-CAPS.log);
       save();
     },
 
@@ -142,9 +199,10 @@
 
     recordSession: function (summary) {
       state.sessions.push(Object.assign({ ts: new Date().toISOString(), date: todayStr() }, summary));
-      if (state.sessions.length > 200) state.sessions.shift();
+      if (state.sessions.length > CAPS.sessions) state.sessions.shift();
       save();
     },
+    sessions: function () { return state.sessions; },
 
     // Recent accuracy (last N attempts) — drives session weighting.
     recentAccuracy: function (ruleId) {
@@ -181,8 +239,104 @@
 
     addDictEntry: function (entry) { state.addedDict.push(entry); save(); },
     addedDict: function () { return state.addedDict; },
-    addPair: function (entry) { state.addedPairs.push(entry); save(); },
+    addPair: function (entry) { state.addedPairs.push(entry); syncUserItems(); save(); },
     addedPairs: function () { return state.addedPairs; },
+
+    /* ---------------- exam-prep layer ---------------- */
+
+    // Daily checklist. Never deletes a key (a deletion would be resurrected by
+    // the other device on merge) — un-ticking writes done:false with a new ts.
+    setTask: function (key, patch) {
+      var cur = state.tasks[key] || { done: false, minutes: 0 };
+      state.tasks[key] = Object.assign({}, cur, patch || {}, { ts: new Date().toISOString() });
+      save();
+      return state.tasks[key];
+    },
+    taskState: function (key) { return state.tasks[key] || null; },
+    tasksOn: function (date) {
+      var out = {};
+      Object.keys(state.tasks).forEach(function (k) { if (k.indexOf(date + "|") === 0) out[k] = state.tasks[k]; });
+      return out;
+    },
+    allTasks: function () { return state.tasks; },
+
+    addExam: function (e) {
+      e = stamp(Object.assign({ id: genId("ex") }, e));
+      state.exams.push(e); cap(state.exams, CAPS.exams); save();
+      return e;
+    },
+    exams: function () { return state.exams; },
+    removeExam: function (id) { if (removeById(state.exams, id)) save(); },
+
+    addWriting: function (w) {
+      w = stamp(Object.assign({ id: genId("wr") }, w));
+      if (w.essay && w.essay.length > CAPS.essayChars) w.essay = w.essay.slice(0, CAPS.essayChars);
+      state.writings.push(w); cap(state.writings, CAPS.writings); save();
+      return w;
+    },
+    updateWriting: function (id, patch) {
+      var w = findById(state.writings, id);
+      if (!w) return null;
+      Object.assign(w, patch || {}, { updatedAt: new Date().toISOString() });
+      if (w.essay && w.essay.length > CAPS.essayChars) w.essay = w.essay.slice(0, CAPS.essayChars);
+      save();
+      return w;
+    },
+    writings: function () { return state.writings; },
+    writing: function (id) { return findById(state.writings, id); },
+    removeWriting: function (id) { if (removeById(state.writings, id)) save(); },
+
+    addSpeaking: function (s) {
+      s = stamp(Object.assign({ id: genId("sp") }, s));
+      state.speaking.push(s); cap(state.speaking, CAPS.speaking); save();
+      return s;
+    },
+    speaking: function () { return state.speaking; },
+    removeSpeaking: function (id) { if (removeById(state.speaking, id)) save(); },
+
+    addReport: function (r) {
+      r = stamp(Object.assign({ id: genId("rp") }, r));
+      state.reports.push(r); cap(state.reports, CAPS.reports); save();
+      return r;
+    },
+    reports: function () { return state.reports; },
+
+    // Vocabulary items from evaluations: { word, gloss_ar, sentence_with_gap, correct_answer, distractors, explanation }.
+    // Deduped by word (case-insensitive) against bundled + added items. Returns the number added.
+    addVocab: function (items) {
+      var have = {};
+      (window.ALL_ITEMS || []).concat(state.addedVocab).forEach(function (i) {
+        if (i && i.rule === "vocab_awl" && (i.word || i.correct_answer)) have[String(i.word || i.correct_answer).toLowerCase()] = true;
+      });
+      var added = 0;
+      (items || []).forEach(function (v) {
+        if (!v || !v.word || !v.sentence_with_gap || !v.correct_answer) return;
+        var k = String(v.word).toLowerCase();
+        if (have[k]) return;
+        have[k] = true;
+        state.addedVocab.push({
+          id: genId("uv"), rule: "vocab_awl", word: v.word, gloss_ar: v.gloss_ar || "",
+          sentence_with_gap: v.sentence_with_gap, correct_answer: v.correct_answer,
+          distractors: (v.distractors || []).slice(0, 3), explanation: v.explanation || v.gloss_ar || "",
+          source: v.source || "ai", addedOn: todayStr()
+        });
+        added++;
+      });
+      if (added) { syncUserItems(); save(); }
+      return added;
+    },
+    addedVocab: function () { return state.addedVocab; },
+
+    plan: function () { return state.plan; },
+    // 2-level merge for hours / ruleWeights so a partial patch never wipes the rest.
+    setPlan: function (patch) {
+      patch = patch || {};
+      var p = Object.assign({}, state.plan, patch);
+      if (patch.hours) p.hours = Object.assign({}, state.plan.hours || {}, patch.hours);
+      if (patch.ruleWeights) p.ruleWeights = Object.assign({}, state.plan.ruleWeights || {}, patch.ruleWeights);
+      state.plan = p; save();
+      return state.plan;
+    },
 
     exportJSON: function () { return JSON.stringify(state, null, 2); },
 
@@ -191,21 +345,22 @@
       var s;
       try { s = JSON.parse(text); } catch (e) { return false; }
       if (!s || typeof s !== "object" || !s.rules) return false;
+      removeUserItems();
       state = s;
       (window.RULES || []).forEach(function (r) {
         if (!state.rules[r.id]) state.rules[r.id] = blankRule();
       });
-      if (!state.log) state.log = [];
-      if (!state.sessions) state.sessions = [];
-      if (!state.addedDict) state.addedDict = [];
-      if (!state.addedPairs) state.addedPairs = [];
       state = upgrade(state);
+      syncUserItems();
       save();
       return true;
     },
 
-    reset: function () { state = fresh(); save(); },
+    reset: function () { removeUserItems(); state = fresh(); save(); },
 
+    todayStr: todayStr,
+    genId: genId,
+    CAPS: CAPS,
     _daysBetween: daysBetween
   };
 

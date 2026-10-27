@@ -32,8 +32,12 @@
   // weakness multiplier: weakest recent accuracy → more reps (existing lever)
   function weakness(ruleId) {
     var acc = window.Store.recentAccuracy(ruleId);
-    if (acc === null) return 1.5;          // never practised → prioritise
-    return 1 + (1 - acc);                  // 0%→2x, 100%→1x
+    var base = acc === null ? 1.5 : 1 + (1 - acc);   // never practised → prioritise; 0%→2x, 100%→1x
+    // essay error tags + weekly-report weights (tracker.js, loaded later) nudge
+    // a rule's share — clamped so a bad report can never zero a rule out.
+    var boost = (window.Tracker && window.Tracker.ruleBoost) ? Number(window.Tracker.ruleBoost(ruleId)) : 1;
+    if (!isFinite(boost) || boost <= 0) boost = 1;
+    return base * Math.min(2, Math.max(0.5, boost));
   }
 
   /* ---------------- calm session (daily default) ----------------

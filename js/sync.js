@@ -69,6 +69,45 @@
     return out;
   }
 
+  // Union by id where the copy with the later updatedAt/ts wins (a record may
+  // be edited after creation — e.g. an evaluation added to an essay).
+  function unionNewest(listA, listB, keyFn, cap) {
+    var map = {}, order = [];
+    listA.concat(listB).forEach(function (x) {
+      var k = keyFn(x);
+      var stamp = String(x.updatedAt || x.ts || "");
+      if (!map[k]) { map[k] = x; order.push(k); }
+      else if (stamp > String(map[k].updatedAt || map[k].ts || "")) map[k] = x;
+    });
+    var out = order.map(function (k) { return map[k]; });
+    out.sort(function (a, b) {
+      return String(a.ts || a.date || "") < String(b.ts || b.date || "") ? -1 : 1;
+    });
+    if (cap && out.length > cap) out = out.slice(-cap);
+    return out;
+  }
+
+  // Daily tasks: per key, the entry with the later ts wins (un-ticking writes
+  // done:false with a new ts, so a deletion is never resurrected).
+  function mergeTasks(ta, tb) {
+    var out = {};
+    [ta || {}, tb || {}].forEach(function (src) {
+      Object.keys(src).forEach(function (k) {
+        var cur = out[k];
+        if (!cur || String(src[k].ts || "") > String(cur.ts || "")) out[k] = src[k];
+      });
+    });
+    return out;
+  }
+
+  function mergePlan(older, newer) {
+    older = older || {}; newer = newer || {};
+    return Object.assign({}, older, newer, {
+      hours: Object.assign({}, older.hours || {}, newer.hours || {}),
+      ruleWeights: Object.assign({}, older.ruleWeights || {}, newer.ruleWeights || {})
+    });
+  }
+
   function mergeStates(a, b) {
     var log = unionBy(a.log || [], b.log || [], function (e) {
       return e.ts + "|" + e.itemId;
@@ -76,6 +115,7 @@
     // newer overall state wins for scalar/dict fields without per-entry keys
     var newer = String(a.updatedAt || "") >= String(b.updatedAt || "") ? a : b;
     var older = newer === a ? b : a;
+    var byId = function (x) { return x.id || x.ts || JSON.stringify(x); };
     // leitner: per item, the entry with the LATER due date is the more recent rep
     var leitner = {};
     [older.leitner || {}, newer.leitner || {}].forEach(function (src) {
@@ -100,6 +140,16 @@
       stageStatus: Object.assign({}, older.stageStatus || {}, newer.stageStatus || {}),
       settings: Object.assign({}, older.settings || {}, newer.settings || {}),
       lastExport: String(a.lastExport || "") > String(b.lastExport || "") ? a.lastExport : b.lastExport,
+      // ---- exam-prep layer ----
+      tasks: mergeTasks(a.tasks, b.tasks),
+      exams: unionNewest(a.exams || [], b.exams || [], byId, 500),
+      writings: unionNewest(a.writings || [], b.writings || [], byId, 100),
+      speaking: unionNewest(a.speaking || [], b.speaking || [], byId, 300),
+      reports: unionNewest(a.reports || [], b.reports || [], byId, 60),
+      addedVocab: unionBy(a.addedVocab || [], b.addedVocab || [], function (v) {
+        return v.id || String(v.word || "").toLowerCase();
+      }),
+      plan: mergePlan(older.plan, newer.plan),
       updatedAt: new Date().toISOString()
     };
   }
@@ -148,9 +198,21 @@
       })
       .then(function (g) {
         var f = g.files && g.files[FILE];
-        if (!f || !f.content) { setStatus("ok"); return false; }
+        if (!f) { setStatus("ok"); return false; }
+        // The Gist API truncates file content above ~1 MB (truncated:true) —
+        // the full text is at raw_url. Secret gists are readable by URL.
+        if (f.truncated && f.raw_url) {
+          return fetch(f.raw_url, { cache: "no-store" }).then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.text();
+          });
+        }
+        return f.content || "";
+      })
+      .then(function (content) {
+        if (!content) { setStatus("ok"); return false; }
         var remote;
-        try { remote = JSON.parse(f.content); } catch (e) { setStatus("ok"); return false; }
+        try { remote = JSON.parse(content); } catch (e) { setStatus("error", "ملف المزامنة تالف — لم يُدمج"); return false; }
         var local = window.Store.get();
         var merged = mergeStates(local, remote);
         // strip volatile updatedAt before comparing content
