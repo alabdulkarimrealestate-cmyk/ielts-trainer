@@ -555,6 +555,11 @@
     Store.exams().forEach(function (e) { rows.push({ ts: e.ts, date: e.date, kind: "exam", txt: SKILL_SHORT[e.skill] + " " + e.raw + "/40 → " + fmtBand(e.band) + (e.source ? " · " + e.source : "") + (e.diagnostic ? " · تشخيصي" : ""), del: function () { Store.removeExam(e.id); } }); });
     Store.writings().forEach(function (w) { var b = w.eval && w.eval.bands ? w.eval.bands.overall : null; rows.push({ ts: w.ts, date: w.date, kind: "writing", txt: "Writing Task " + w.task + (b != null ? " → " + fmtBand(b) : " (بلا تقييم)") + (w.parentId ? " · إعادة كتابة" : ""), del: function () { Store.removeWriting(w.id); } }); });
     Store.speaking().forEach(function (s) { rows.push({ ts: s.ts, date: s.date, kind: "speaking", txt: "Speaking (" + (KIND_AR[s.kind] || s.kind) + ") → " + fmtBand(s.bands && s.bands.overall), del: function () { Store.removeSpeaking(s.id); } }); });
+    (Store.chats ? Store.chats() : []).forEach(function (ch) {
+      rows.push({ ts: ch.ts, date: ch.date, kind: "chat", messages: ch.messages || [],
+                  txt: "💬 حوار حول خطأ — " + (window.ruleLabel ? window.ruleLabel(ch.rule) : ch.rule || "") + " (" + (ch.messages || []).length + " رسائل)",
+                  del: function () { Store.removeChat(ch.id); } });
+    });
     rows.sort(function (a, b) { return a.ts < b.ts ? 1 : -1; });
     if (!rows.length) c.appendChild(noteP("لا نتائج مسجّلة بعد."));
     rows.slice(0, 40).forEach(function (r) {
@@ -563,6 +568,12 @@
       row.appendChild(el("span", "hist-txt", r.txt));
       row.appendChild(btn("حذف", "small ghost danger", function () { if (confirm("حذف هذا السجل؟")) { r.del(); go("log", { tab: "history" }); } }));
       c.appendChild(row);
+      if (r.messages && r.messages.length) {
+        var det = el("details", "rep-wrap"); det.appendChild(el("summary", null, "اقرأ الحوار"));
+        var tr = el("div", "chat-transcript");
+        r.messages.forEach(function (m) { var mm = el("div", "msg " + (m.role === "model" ? "model" : "user")); mm.dir = "auto"; mm.textContent = m.text; tr.appendChild(mm); });
+        det.appendChild(tr); c.appendChild(det);
+      }
     });
     host.appendChild(c);
   }

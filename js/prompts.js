@@ -382,6 +382,28 @@ topic
            [item.correct_answer].concat(item.distractors || []).join(", ") + '.';
   }
 
+  // In-page Gemini chat (chat.js): system persona + the hidden opening turn.
+  // Replies are read aloud, so they must be short and free of markdown.
+  function errorChatSystem() {
+    return [
+'أنت مدرّب IELTS تحاور متحدث عربية (هدفه باند 7.0 أكاديمي) حوارًا سقراطيًا حيًا بالعربية حول خطأ ارتكبه في تمرين قواعد/مفردات/نطق.',
+'قواعدك: ١) شخّص سوء الفهم الجذري من تفكيره المكتوب — لا تفترض، استنتج من كلامه. ٢) سؤال واحد قصير في كل رسالة ثم انتظر ردّه؛ لا محاضرات. ٣) اربط الخطأ بتداخل اللغة العربية إن كان هو السبب. ٤) حين يقترب من الفهم اطلب منه شرح القاعدة بكلماته. ٥) في النهاية اختبره بثلاثة أمثلة جديدة من النمط نفسه، ولا تعتبر الحوار منتهيًا إلا بإجابات صحيحة معلَّلة. ٦) الأمثلة الإنجليزية تبقى بالإنجليزية، والشرح والحوار بالعربية. ٧) إن تكلّم بالعامية فأجبه بعربية سهلة قريبة منها.',
+'ردودك تُقرأ بصوت عالٍ: اجعل كل ردّ من جملتين إلى أربع، بلا عناوين ولا قوائم ولا رموز تنسيق (لا نجوم ولا #).'
+    ].join("\n");
+  }
+  function errorChatOpening(item, userAnswer, userReasoning) {
+    return [
+'=== الخطأ ===',
+'القاعدة المستهدفة: ' + (window.ruleLabel ? window.ruleLabel(item.rule) : item.rule),
+'السؤال: ' + describeItem(item),
+'إجابتي (الخاطئة): "' + userAnswer + '"',
+'تفكيري وقت الإجابة (كتبته قبل أن أعرف الحل): "' + (userReasoning || "—") + '"',
+'الشرح المختصر في التطبيق: ' + (item.explanation || "—"),
+'',
+'ابدأ الآن بسؤالك التشخيصي الأول.'
+    ].join("\n");
+  }
+
   // Socratic error-discussion chat: paste into Claude, converse until mastery.
   function errorChat(item, userAnswer, userReasoning) {
     return [
@@ -438,6 +460,8 @@ topic
     translate: translatePrompt,
     image: imagePrompt,
     errorChat: errorChat,
+    errorChatSystem: errorChatSystem,
+    errorChatOpening: errorChatOpening,
     copy: copy
   };
 })();

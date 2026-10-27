@@ -118,13 +118,45 @@
     return parts.map(function (p) { return p.text || ""; }).join("");
   }
 
+  function modelCandidates() {
+    var candidates = [model()].concat((cfg.models || []).filter(function (m) { return m !== model(); }).slice(0, 2),
+                                      STATIC_FALLBACKS.filter(function (m) { return m !== model(); }));
+    var seen = {};
+    return candidates.filter(function (m) { if (seen[m]) return false; seen[m] = 1; return true; });
+  }
+
+  // Multi-turn plain-text chat. history: [{ role: "user" | "model", text }].
+  // Same model fallback as generateJSON; the last 24 turns are sent.
+  function chat(history, system, opts) {
+    opts = opts || {};
+    var contents = (history || []).slice(-24).map(function (h) {
+      return { role: h.role === "model" ? "model" : "user", parts: [{ text: String(h.text || "") }] };
+    });
+    if (!contents.length) return Promise.reject(aiError("bad_request", "لا رسالة لإرسالها."));
+    var candidates = modelCandidates();
+    function attempt(idx, withThinking) {
+      if (idx >= candidates.length) return Promise.reject(aiError("no_model", "لا يوجد نموذج Gemini متاح لهذا المفتاح — افتح الإعدادات واختر نموذجًا."));
+      var m = candidates[idx];
+      var gen = { temperature: opts.temperature != null ? opts.temperature : 0.7, maxOutputTokens: opts.maxOutputTokens || 1024 };
+      if (withThinking && /2\.5/.test(m)) gen.thinkingConfig = { thinkingBudget: 0 };
+      var body = { contents: contents, generationConfig: gen };
+      if (system) body.systemInstruction = { parts: [{ text: system }] };
+      return request("/models/" + encodeURIComponent(m) + ":generateContent", { method: "POST", body: body, modelName: m })
+        .then(function (data) { return extractText(data).trim(); })
+        .catch(function (err) {
+          if (err && err.code === "no_model") return attempt(idx + 1, withThinking);
+          if (err && err.code === "bad_request" && withThinking && /thinking/i.test(err.message || "")) return attempt(idx, false);
+          throw err;
+        });
+    }
+    return attempt(0, true);
+  }
+
   // One JSON-mode call. Tries the configured model, then the known fallbacks
   // on "model not found"; drops thinkingConfig if the model rejects it.
   function generateJSON(prompt, schema, opts) {
     opts = opts || {};
-    var candidates = [model()].concat((cfg.models || []).filter(function (m) { return m !== model(); }).slice(0, 2),
-                                      STATIC_FALLBACKS.filter(function (m) { return m !== model(); }));
-    var seen = {}; candidates = candidates.filter(function (m) { if (seen[m]) return false; seen[m] = 1; return true; });
+    var candidates = modelCandidates();
 
     function attempt(idx, withThinking) {
       if (idx >= candidates.length) return Promise.reject(aiError("no_model", "لا يوجد نموذج Gemini متاح لهذا المفتاح — افتح الإعدادات واختر نموذجًا."));
@@ -191,7 +223,7 @@
     enabled: enabled, model: model, models: function () { return cfg.models || []; },
     lastOk: function () { return cfg.lastOk || null; },
     enable: enable, disable: disable, setModel: setModel, listModels: listModels,
-    generateJSON: generateJSON,
+    generateJSON: generateJSON, chat: chat,
     evaluateWriting: evaluateWriting, evaluateSpeakingTranscript: evaluateSpeakingTranscript, weeklyReport: weeklyReport
   };
 })();

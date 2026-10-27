@@ -146,6 +146,7 @@
       writings: unionNewest(a.writings || [], b.writings || [], byId, 100),
       speaking: unionNewest(a.speaking || [], b.speaking || [], byId, 300),
       reports: unionNewest(a.reports || [], b.reports || [], byId, 60),
+      chats: unionNewest(a.chats || [], b.chats || [], byId, 100),
       addedVocab: unionBy(a.addedVocab || [], b.addedVocab || [], function (v) {
         return v.id || String(v.word || "").toLowerCase();
       }),

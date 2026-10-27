@@ -21,7 +21,7 @@
   }
 
   // size caps — the whole state is pushed to a Gist (truncated above ~1 MB)
-  var CAPS = { log: 5000, sessions: 200, exams: 500, writings: 100, speaking: 300, reports: 60, essayChars: 2500 };
+  var CAPS = { log: 5000, sessions: 200, exams: 500, writings: 100, speaking: 300, reports: 60, chats: 100, chatMessages: 40, essayChars: 2500 };
 
   function blankRule() {
     return { attempts: 0, correct: 0, streak: 0, lastPracticed: null, recent: [] };
@@ -44,6 +44,7 @@
       speaking: [],          // tutor / self / AI-transcript sessions
       reports: [],           // weekly AI reports
       addedVocab: [],        // drill items (rule "vocab_awl") added from evaluations
+      chats: [],             // in-page Socratic error chats: { id, ts, date, itemId, rule, messages[] }
       plan: blankPlan()
     };
     (window.RULES || []).forEach(function (r) { s.rules[r.id] = blankRule(); });
@@ -56,7 +57,7 @@
     if (!s.stageStatus) s.stageStatus = {};
     if (!s.settings) s.settings = { sessionMinutes: 15, loadItems: 10, loadSeconds: 300 };
     if (!("lastExport" in s)) s.lastExport = null;
-    ["log", "sessions", "addedDict", "addedPairs", "exams", "writings", "speaking", "reports", "addedVocab"]
+    ["log", "sessions", "addedDict", "addedPairs", "exams", "writings", "speaking", "reports", "addedVocab", "chats"]
       .forEach(function (k) { if (!Array.isArray(s[k])) s[k] = []; });
     if (!s.tasks || typeof s.tasks !== "object") s.tasks = {};
     s.plan = Object.assign(blankPlan(), s.plan || {});
@@ -300,6 +301,24 @@
       return r;
     },
     reports: function () { return state.reports; },
+
+    // Socratic error chats (messages: [{ role: "user"|"model", text }]).
+    addChat: function (c) {
+      c = stamp(Object.assign({ id: genId("ch") }, c));
+      c.messages = (c.messages || []).slice(-CAPS.chatMessages);
+      state.chats.push(c); cap(state.chats, CAPS.chats); save();
+      return c;
+    },
+    updateChat: function (id, patch) {
+      var c = findById(state.chats, id);
+      if (!c) return null;
+      Object.assign(c, patch || {}, { updatedAt: new Date().toISOString() });
+      c.messages = (c.messages || []).slice(-CAPS.chatMessages);
+      save();
+      return c;
+    },
+    chats: function () { return state.chats; },
+    removeChat: function (id) { if (removeById(state.chats, id)) save(); },
 
     // Vocabulary items from evaluations: { word, gloss_ar, sentence_with_gap, correct_answer, distractors, explanation }.
     // Deduped by word (case-insensitive) against bundled + added items. Returns the number added.

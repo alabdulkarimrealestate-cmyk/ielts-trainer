@@ -209,20 +209,31 @@
           "🗣 اقرأها بصوت عالٍ الآن ×٣ — بالنبر الصحيح قبل أن تنتقل"));
       }
 
-      // Wrong answer -> offer a live Socratic error-chat prompt for Claude,
-      // built from the user's OWN typed reasoning (the real misconception).
+      // Wrong answer -> live Socratic chat with Gemini right here (text or
+      // voice), built from the user's OWN typed reasoning (the real
+      // misconception). Copy-to-Claude stays as the no-key fallback.
       if (!correct) {
-        var chatBtn = el("button", "btn wide chat-btn", "💬 افهم خطأك — ناقشه مع Claude (نسخ)");
-        chatBtn.type = "button";
-        chatBtn.onclick = function () {
-          window.Prompts.copy(
-            window.Prompts.errorChat(item, ctrl.answerText(), reason.value.trim()),
-            chatBtn
-          );
-        };
-        feedback.appendChild(chatBtn);
-        feedback.appendChild(el("div", "chat-hint",
-          "انسخ ← افتح Claude ← الصق. سيحاورك سؤالًا بسؤال حتى الفهم الكامل، ثم يختبرك بأمثلة جديدة."));
+        var answerTxt = ctrl.answerText(), reasonTxt = reason.value.trim();
+        var chatHost = el("div", "chat-host");
+        if (window.AI && window.AI.enabled() && window.Chat) {
+          var openBtn = el("button", "btn wide chat-btn", "💬 ناقش خطأك مع Gemini الآن — كتابة أو صوت");
+          openBtn.type = "button";
+          openBtn.onclick = function () {
+            openBtn.classList.add("hidden");
+            window.Chat.openForError(chatHost, item, answerTxt, reasonTxt, function () { openBtn.classList.remove("hidden"); });
+          };
+          feedback.appendChild(openBtn);
+        } else {
+          var enableBtn = el("button", "btn wide chat-btn", "💬 فعّل Gemini لتناقش خطأك هنا (كتابة وصوت)");
+          enableBtn.type = "button";
+          enableBtn.onclick = function () { if (window.App) window.App.go("plan"); };
+          feedback.appendChild(enableBtn);
+          var copyBtn = el("button", "btn small", "أو انسخ الحوار لـ Claude");
+          copyBtn.type = "button";
+          copyBtn.onclick = function () { window.Prompts.copy(window.Prompts.errorChat(item, answerTxt, reasonTxt), copyBtn); };
+          feedback.appendChild(copyBtn);
+        }
+        feedback.appendChild(chatHost);
       }
 
       var next = el("button", "btn wide", "التالي ⟵");

@@ -1,6 +1,6 @@
 /* sw.js — offline cache for the whole app (cache-first).
    Bump CACHE_VERSION whenever you edit any file so devices pick up changes. */
-var CACHE_VERSION = "ielts-trainer-v6";
+var CACHE_VERSION = "ielts-trainer-v7";
 
 var ASSETS = [
   "./",
@@ -37,6 +37,7 @@ var ASSETS = [
   "./js/diagrams.js",
   "./js/dashboard.js",
   "./js/prompts.js",
+  "./js/chat.js",
   "./js/views_prep.js",
   "./js/app.js",
   "./icons/icon-192.png",

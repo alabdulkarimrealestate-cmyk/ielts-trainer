@@ -27,6 +27,7 @@
 
   function go(route, arg) {
     currentRoute = route;
+    if (window.Chat) window.Chat.stopActive();   // stop mic / speech when leaving a screen
     window.scrollTo(0, 0);
     clear(view);
     (VIEWS[route] || VIEWS.today)(arg);
@@ -663,15 +664,22 @@
           '<span class="lg-mark">' + (e.correct ? "✓" : "✗") + '</span></div>' +
           '<div class="lg-ans ltr">إجابتك: ' + escapeHtml(e.answer) + '</div>' +
           '<div class="lg-reason">سببك: ' + escapeHtml(e.reasoning || "—") + '</div>';
-        // Old mistakes stay discussable: rebuild the Socratic chat prompt.
+        // Old mistakes stay discussable: live Gemini chat in place, or the
+        // copy-to-Claude prompt when no key is set.
         if (!e.correct) {
           var it = window.ALL_ITEMS.filter(function (x) { return x.id === e.itemId; })[0];
           if (it) {
-            var cb = el("button", "btn small chat-btn", "💬 ناقش هذا الخطأ مع Claude");
+            var cb = el("button", "btn small chat-btn", (window.AI && window.AI.enabled()) ? "💬 ناقش هذا الخطأ مع Gemini" : "💬 انسخ الحوار لـ Claude");
+            var host = el("div", "chat-host");
             cb.onclick = function () {
-              window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cb);
+              if (window.AI && window.AI.enabled() && window.Chat) {
+                cb.classList.add("hidden");
+                window.Chat.openForError(host, it, e.answer, e.reasoning, function () { cb.classList.remove("hidden"); });
+              } else {
+                window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cb);
+              }
             };
-            row.appendChild(cb);
+            row.appendChild(cb); row.appendChild(host);
           }
         }
         lb.appendChild(row);
