@@ -557,6 +557,7 @@ h1,h2,h3{margin:0 0 .4em}
   .view{padding:12px}
   .float-translate{bottom:calc(76px + env(safe-area-inset-bottom)); padding:10px 14px; font-size:13px}
   .fab-gemini{bottom:calc(74px + env(safe-area-inset-bottom)); width:52px; height:52px}
+  .fab-gemini.open{display:none}   /* the sheet has its own ✕; the button would cover "Send" */
   .chat-drawer{inset-inline-end:0; inset-inline-start:0; bottom:0; width:auto; height:min(640px, 82vh); border-radius:18px 18px 0 0; border-bottom:none;
     padding-bottom:env(safe-area-inset-bottom)}
   .btn{min-height:44px}
