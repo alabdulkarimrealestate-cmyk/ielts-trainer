@@ -32,7 +32,8 @@
     clear(view);
     (VIEWS[route] || VIEWS.today)(arg);
     var navId = (route === "session") ? "practice" : (MORE_ROUTES[route] ? "more" : route);
-    var bottomId = { dashboard: "more", plan: "more", report: "more" }[navId] || navId;
+    var bottomId = { dashboard: "more", plan: "more", report: "more", log: "more" }[navId] || navId;
+    if (window.Recorder && route !== "speak") window.Recorder.cancel();   // never leave the mic open behind a screen
     Array.prototype.forEach.call(document.querySelectorAll(".navbtn[data-route]"), function (b) {
       b.classList.toggle("active", b.dataset.route === navId);
     });
@@ -765,7 +766,7 @@
 
     // phone: bottom tab bar (CSS shows it ≤640px and hides the chip nav)
     var bottom = el("nav", "bottombar");
-    [["today", "📅", "اليوم"], ["practice", "🎯", "تدرّب"], ["writing", "✍️", "الكتابة"], ["log", "📝", "سجّل"],
+    [["today", "📅", "اليوم"], ["practice", "🎯", "تدرّب"], ["speak", "🗣", "تكلّم"], ["writing", "✍️", "الكتابة"],
      ["progress", "📈", "التقدّم"], ["more", "⋯", "المزيد"]].forEach(function (r) {
       var b = el("button", "navbtn-b");
       b.type = "button"; b.dataset.route = r[0];

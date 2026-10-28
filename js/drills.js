@@ -208,9 +208,27 @@
 
       // Stress cards bridge knowledge -> execution: remind to read aloud NOW.
       // (Text reminder only — actual audio practice stays in ELSA.)
+      // Stress cards bridge knowledge → execution: say it now and Gemini
+      // listens (pron.js); without a microphone/key, the text reminder stays.
       if (window.READ_ALOUD_RULES && window.READ_ALOUD_RULES[item.rule]) {
-        feedback.appendChild(el("div", "read-aloud",
-          "🗣 اقرأها بصوت عالٍ الآن ×٣ — بالنبر الصحيح قبل أن تنتقل"));
+        if (window.Pron && window.Recorder && window.Recorder.supported()) {
+          var sayTarget = item.rule === "word_stress" ? item.word : (item.words || []).join(" ");
+          var sayBtn = el("button", "btn wide pron-btn", "🎙 انطقها الآن — Gemini يسمعك ويقيّم النبر");
+          sayBtn.type = "button";
+          var sayHost = el("div", "pron-host");
+          sayBtn.onclick = function () {
+            sayBtn.classList.add("hidden");
+            window.Pron.quickAssess(sayHost, {
+              target: sayTarget, ipa: item.ipa || "",
+              stress: item.rule === "word_stress" ? item.syllables.map(function (s, i) { return i === item.correct_index ? s.toUpperCase() : s.toLowerCase(); }).join("-") : "",
+              unitId: item.rule === "word_stress" ? "word_stress" : "intonation"
+            });
+          };
+          feedback.appendChild(sayBtn); feedback.appendChild(sayHost);
+        } else {
+          feedback.appendChild(el("div", "read-aloud",
+            "🗣 اقرأها بصوت عالٍ الآن ×٣ — بالنبر الصحيح قبل أن تنتقل"));
+        }
       }
 
       // Wrong answer -> live Socratic chat with Gemini right here (text or

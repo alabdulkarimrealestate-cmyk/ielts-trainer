@@ -110,6 +110,11 @@
   /* ---------------- task actions ---------------- */
   function runAction(t) {
     var a = t.action || "none";
+    if (a === "pron" || a.indexOf("pron:") === 0) {
+      var unit = a === "pron" ? ((window.Pron && window.Pron.recommendedUnit()) || {}).id : a.slice(5);
+      return go("speak", { tab: "lab", unit: unit, taskKey: t.key, minutes: t.min });
+    }
+    if (a.indexOf("mock:") === 0) return go("speak", { tab: "mock", mode: a.slice(5), taskKey: t.key, minutes: t.min });
     if (a === "session") return go("session");
     if (a === "load") return go("load");
     if (a.indexOf("rule:") === 0) {
@@ -131,6 +136,8 @@
     if (a === "log:exam") return "سجّل الدرجة";
     if (a === "log:speaking") return "سجّل الباندات";
     if (a === "cards") return "بطاقة + مؤقّت";
+    if (a === "pron" || a.indexOf("pron:") === 0) return "🎙 انطق";
+    if (a.indexOf("mock:") === 0) return "🎤 ابدأ";
     return null;
   }
   function markTaskDone(key, minutes) {
@@ -563,7 +570,7 @@
     var rows = [];
     Store.exams().forEach(function (e) { rows.push({ ts: e.ts, date: e.date, kind: "exam", txt: SKILL_SHORT[e.skill] + " " + e.raw + "/40 → " + fmtBand(e.band) + (e.source ? " · " + e.source : "") + (e.diagnostic ? " · تشخيصي" : ""), del: function () { Store.removeExam(e.id); } }); });
     Store.writings().forEach(function (w) { var b = w.eval && w.eval.bands ? w.eval.bands.overall : null; rows.push({ ts: w.ts, date: w.date, kind: "writing", txt: "Writing Task " + w.task + (b != null ? " → " + fmtBand(b) : " (بلا تقييم)") + (w.parentId ? " · إعادة كتابة" : ""), del: function () { Store.removeWriting(w.id); } }); });
-    Store.speaking().forEach(function (s) { rows.push({ ts: s.ts, date: s.date, kind: "speaking", txt: "Speaking (" + (KIND_AR[s.kind] || s.kind) + ") → " + fmtBand(s.bands && s.bands.overall), del: function () { Store.removeSpeaking(s.id); } }); });
+    Store.speaking().forEach(function (s) { rows.push({ ts: s.ts, date: s.date, kind: "speaking", txt: "Speaking (" + (s.kind === "ai-audio" ? "امتحان محاكى بالصوت" : (KIND_AR[s.kind] || s.kind)) + ") → " + fmtBand(s.bands && s.bands.overall), del: function () { Store.removeSpeaking(s.id); } }); });
     (Store.chats ? Store.chats() : []).forEach(function (ch) {
       rows.push({ ts: ch.ts, date: ch.date, kind: "chat", messages: ch.messages || [],
                   txt: "💬 حوار حول خطأ — " + (window.ruleLabel ? window.ruleLabel(ch.rule) : ch.rule || "") + " (" + (ch.messages || []).length + " رسائل)",
@@ -815,6 +822,23 @@
     });
     wrap.appendChild(grid);
 
+    // pronunciation profile (lab scores from Gemini listening to recordings)
+    if (window.Pron && window.Pron.units().length) {
+      var pc = card("🎙 خريطة نطقك");
+      var pov = window.Pron.overallStats();
+      pc.appendChild(noteP(pov.n ? "متوسط آخر ٢٠ محاولة: " + pov.avg + "/100 · إجمالي " + pov.n + " محاولة · كلمات للمراجعة: " + Store.pronWords().length
+                                 : "لم تبدأ مختبر النطق بعد — جولة واحدة (٨ تمارين) تكفي لترى أين تقف."));
+      window.Pron.weakestUnits(3).forEach(function (x) {
+        var r = el("div", "tag-row");
+        r.appendChild(el("span", "tag-name", x.unit.title_ar + " — " + x.stats.avg));
+        var bar = el("div", "tag-bar"); var f = el("span"); f.style.width = x.stats.avg + "%"; bar.appendChild(f); r.appendChild(bar);
+        r.appendChild(btn("تدرّب", "small", function () { go("speak", { tab: "lab", unit: x.unit.id }); }));
+        pc.appendChild(r);
+      });
+      pc.appendChild(btn("افتح مختبر النطق", "wide", function () { go("speak", { tab: "lab" }); }));
+      wrap.appendChild(pc);
+    }
+
     var diag = Tracker.diagnosticBands();
     if (diag.listening != null || diag.reading != null || diag.writing != null || diag.speaking != null) wrap.appendChild(decisionCard(diag, !Plan.examDateIsSet()));
 
@@ -942,7 +966,7 @@
     var wrap = el("div", "page");
     wrap.appendChild(el("h2", "page-title", "المزيد"));
     var grid = el("div", "quick-grid");
-    [["dashboard", "📊", "لوحة القواعد"], ["plan", "🗓️", "الخطة والإعدادات"], ["report", "🤖", "تقرير AI الأسبوعي"],
+    [["log", "📝", "سجّل نتيجة (L/R · مدرّس)"], ["dashboard", "📊", "لوحة القواعد"], ["plan", "🗓️", "الخطة والإعدادات"], ["report", "🤖", "تقرير AI الأسبوعي"],
      ["load", "⚡", "جلسة تحت الضغط"], ["roadmap", "🗺️", "خريطة القواعد"], ["dictionary", "🔊", "قاموس النطق"], ["reference", "📚", "مرجع المتلازمات"],
      ["diagrams", "🖼️", "رسوم توضيحية"], ["translate", "🌐", "ترجمة"], ["data", "💾", "البيانات والمزامنة"]].forEach(function (q) {
       var b = el("button", "quick", q[1] + "\n" + q[2]); b.type = "button"; b.onclick = function () { go(q[0]); }; grid.appendChild(b);
@@ -954,6 +978,7 @@
   window.EXTRA_ROUTES = [
     { id: "today",    label: "اليوم",       icon: "📅" },
     { id: "practice", label: "تدرّب",       icon: "🎯" },
+    { id: "speak",    label: "تكلّم",       icon: "🗣" },
     { id: "writing",  label: "الكتابة",     icon: "✍️" },
     { id: "log",      label: "سجّل نتيجة",  icon: "📝" },
     { id: "progress", label: "التقدّم",     icon: "📈" },
@@ -962,6 +987,7 @@
     { id: "report",   label: "تقرير AI",    icon: "🤖" },
     { id: "more",     label: "المزيد",      icon: "⋯" }
   ];
-  window.EXTRA_VIEWS = { today: todayView, plan: planView, log: logView, writing: writingView, progress: progressView, report: reportView, more: moreView };
+  window.EXTRA_VIEWS = { today: todayView, plan: planView, log: logView, writing: writingView, progress: progressView, report: reportView, more: moreView,
+                         speak: function (arg) { if (window.Speak) window.Speak.view(arg); } };
   window.PrepViews = { aiBox: aiBox, lineChart: lineChart, decisionCard: decisionCard };
 })();

@@ -20,9 +20,9 @@
  * ========================================================================== */
 (function () {
   var T = {
-    pron:        { id: "pron",        skill: "speaking",   label_ar: "نطق وتقليد (shadowing) — ELSA / Underhill", min: 20, kind: "pron",     action: "rule:word_stress" },
-    pron10:      { id: "pron",        skill: "speaking",   label_ar: "نطق وتقليد (shadowing)", min: 10, kind: "pron",     action: "rule:word_stress" },
-    pron15:      { id: "pron",        skill: "speaking",   label_ar: "نطق وتقليد (shadowing)", min: 15, kind: "pron",     action: "rule:word_stress" },
+    pron:        { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — جولة الصوت المقترح (Gemini يسمعك)", min: 20, kind: "pron", action: "pron" },
+    pron10:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — جولة قصيرة", min: 10, kind: "pron", action: "pron" },
+    pron15:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — كلماتي للمراجعة", min: 15, kind: "pron", action: "pron:my_words" },
     vocab:       { id: "vocab",       skill: "vocabulary", label_ar: "مفردات أكاديمية — بطاقات AWL", min: 15, kind: "vocab",    action: "rule:vocab_awl" },
     grammar:     { id: "grammar",     skill: "writing",    label_ar: "جلسة القواعد ١٥ دقيقة (فكّر قبل الكشف)", min: 15, kind: "drill", action: "session", optional: true },
     podcast:     { id: "podcast",     skill: "listening",  label_ar: "بودكاست إنجليزي في الطريق (لا يُحسب من الساعات)", min: 0, kind: "listen", action: "none", optional: true },
@@ -31,7 +31,7 @@
     t1timed:     { id: "t1_timed",    skill: "writing",    label_ar: "Writing Task 1 بالتوقيت (٢٠ د) + تقييم", min: 30, kind: "writing", action: "writing:1", logs: "writing" },
     readPassage: { id: "read_passage", skill: "reading",   label_ar: "Reading: passage واحدة + تحليل كل غلطة", min: 40, kind: "practice", action: "log:exam", logs: "exam" },
     t2write:     { id: "t2_write",    skill: "writing",    label_ar: "Writing Task 2: تخطيط + كتابة (٤٠ د)", min: 40, kind: "writing", action: "writing:2", logs: "writing" },
-    speakCards:  { id: "speak_cards", skill: "speaking",   label_ar: "Speaking: سجّل ٣ بطاقات Part 2 واسمعها", min: 40, kind: "speaking", action: "cards" },
+    speakCards:  { id: "speak_cards", skill: "speaking",   label_ar: "Speaking Part 2 محاكى: بطاقة مسجّلة يقيّمها الممتحن (كرّرها حتى ٣ بطاقات)", min: 40, kind: "speaking", action: "mock:2" },
     lrTest:      { id: "lr_test",     skill: "listening",  label_ar: "امتحان Listening + Reading كامل بالتوقيت + سجل الأخطاء", min: 120, kind: "test", action: "log:exam", logs: "exam" },
     t2rewrite:   { id: "t2_timed_rewrite", skill: "writing", label_ar: "Task 2 بالتوقيت + إعادة كتابته بعد التقييم", min: 90, kind: "writing", action: "writing:2", logs: "writing" },
     italki:      { id: "italki",      skill: "speaking",   label_ar: "حصة italki (٣٠ د) — سجّل الباندات من المدرّس", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking" },
@@ -120,7 +120,7 @@
       { id: "diag_lr",        skill: "listening", label_ar: "امتحان Listening + Reading كامل (Cambridge، بالتوقيت، جلسة واحدة) — سجّل الدرجتين", min: 160, kind: "test", action: "log:exam", logs: "exam" },
       { id: "diag_w1",        skill: "writing",   label_ar: "Writing Task 1 على الكمبيوتر (٢٠ د) + تقييم", min: 20, kind: "writing", action: "writing:1", logs: "writing" },
       { id: "diag_w2",        skill: "writing",   label_ar: "Writing Task 2 على الكمبيوتر (٤٠ د) + تقييم", min: 40, kind: "writing", action: "writing:2", logs: "writing" },
-      { id: "diag_speak_rec", skill: "speaking",  label_ar: "سجّل امتحان Speaking كامل بالأجزاء الثلاثة (١١–١٤ د)", min: 15, kind: "speaking", action: "cards" },
+      { id: "diag_speak_rec", skill: "speaking",  label_ar: "امتحان Speaking محاكى كامل (Part 1-2-3) يسمعه ويقيّمه الممتحن الذكي", min: 15, kind: "speaking", action: "mock:full" },
       { id: "diag_italki",    skill: "speaking",  label_ar: "حصة تقييم مع مدرّس italki — سجّل الباندات", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking" }
     ],
 
@@ -180,7 +180,8 @@
       { name: "Gemini داخل التطبيق + band descriptors", skill_ar: "Writing", use_ar: "تقييم كل مقال بالمعايير الأربعة ومتابعة أخطائك المتكررة", cost_ar: "مجاني (طبقة مجانية)" },
       { name: "italki — مدرّس IELTS (يفضّل ممتحن سابق)", skill_ar: "Speaking · Writing", use_ar: "التقييم البشري الذي لا يستطيعه الذكاء الاصطناعي — مرة أسبوعيًا", cost_ar: "مدفوع بالحصة", url: "https://www.italki.com" },
       { name: "Adrian Underhill — Sound Foundations", skill_ar: "Speaking", use_ar: "أساس الأصوات ومخارجها (p/b، v/f، النبر)", cost_ar: "فيديوهات مجانية" },
-      { name: "ELSA Speak", skill_ar: "Speaking", use_ar: "تمرين نطق يومي بتصحيح تلقائي لكل صوت", cost_ar: "مجاني مع نسخة مدفوعة" },
+      { name: "مختبر النطق + امتحان Speaking داخل التطبيق", skill_ar: "Speaking", use_ar: "تمرين نطق يومي يسمعه Gemini ويقيّمه لكل صوت وكلمة، وامتحان محاكى بالمعايير الأربعة — بديل ELSA", cost_ar: "مجاني (طبقة Gemini المجانية)" },
+      { name: "ELSA Speak", skill_ar: "Speaking", use_ar: "اختياري الآن — مقيّم نطق متخصص أدقّ في الأصوات المفردة إن أردت رأيًا ثانيًا", cost_ar: "مجاني مع نسخة مدفوعة" },
       { name: "BBC 6 Minute English + بودكاست اقتصادي", skill_ar: "Listening", use_ar: "في الطريق — مواضيع تهمك لتستمر", cost_ar: "مجاني" },
       { name: "IDP Salmiya (Dalal Complex)", skill_ar: "الامتحان", use_ar: "يقدّم IELTS Academic على الكمبيوتر", cost_ar: "رسوم الامتحان" }
     ]

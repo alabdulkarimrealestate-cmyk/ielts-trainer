@@ -193,13 +193,16 @@
 
   // One JSON-mode call. Tries the configured model, then the known fallbacks
   // on "model not found"; drops thinkingConfig if the model rejects it.
+  // prompt: a string, or an array of parts (text and inlineData audio) for
+  // listening tasks — every Gemini 2.x/3.x flash model accepts audio input.
   function generateJSON(prompt, schema, opts) {
     opts = opts || {};
+    var parts = Array.isArray(prompt) ? prompt : [{ text: prompt }];
     return withFallback(modelCandidates(), function (m, withThinking) {
       var gen = { responseMimeType: "application/json", temperature: opts.temperature != null ? opts.temperature : 0.2, maxOutputTokens: opts.maxOutputTokens || 8192 };
       if (schema) gen.responseSchema = schema;
       if (withThinking && /2\.5/.test(m)) gen.thinkingConfig = { thinkingBudget: 0 };
-      var body = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: gen };
+      var body = { contents: [{ role: "user", parts: parts }], generationConfig: gen };
       if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
       return request("/models/" + encodeURIComponent(m) + ":generateContent", { method: "POST", body: body, modelName: m })
         .then(function (data) {

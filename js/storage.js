@@ -21,7 +21,7 @@
   }
 
   // size caps — the whole state is pushed to a Gist (truncated above ~1 MB)
-  var CAPS = { log: 5000, sessions: 200, exams: 500, writings: 100, speaking: 300, reports: 60, chats: 100, chatMessages: 40, essayChars: 2500 };
+  var CAPS = { log: 5000, sessions: 200, exams: 500, writings: 100, speaking: 300, reports: 60, chats: 100, chatMessages: 40, essayChars: 2500, pron: 800, pronWords: 200 };
 
   function blankRule() {
     return { attempts: 0, correct: 0, streak: 0, lastPracticed: null, recent: [] };
@@ -45,6 +45,8 @@
       reports: [],           // weekly AI reports
       addedVocab: [],        // drill items (rule "vocab_awl") added from evaluations
       chats: [],             // in-page Socratic error chats: { id, ts, date, itemId, rule, messages[] }
+      pron: [],              // pronunciation-lab attempts (AI listened): { id, ts, date, unit, kind, target, overall, focus, words[], heard }
+      pronWords: [],         // words to re-practise (low lab scores, mock-test mispronunciations): { w, ipa, note_ar, source, ts }
       plan: blankPlan()
     };
     (window.RULES || []).forEach(function (r) { s.rules[r.id] = blankRule(); });
@@ -57,7 +59,7 @@
     if (!s.stageStatus) s.stageStatus = {};
     if (!s.settings) s.settings = { sessionMinutes: 15, loadItems: 10, loadSeconds: 300 };
     if (!("lastExport" in s)) s.lastExport = null;
-    ["log", "sessions", "addedDict", "addedPairs", "exams", "writings", "speaking", "reports", "addedVocab", "chats"]
+    ["log", "sessions", "addedDict", "addedPairs", "exams", "writings", "speaking", "reports", "addedVocab", "chats", "pron", "pronWords"]
       .forEach(function (k) { if (!Array.isArray(s[k])) s[k] = []; });
     if (!s.tasks || typeof s.tasks !== "object") s.tasks = {};
     s.plan = Object.assign(blankPlan(), s.plan || {});
@@ -319,6 +321,35 @@
     },
     chats: function () { return state.chats; },
     removeChat: function (id) { if (removeById(state.chats, id)) save(); },
+
+    // Pronunciation lab attempts (scores only — audio is never stored).
+    addPron: function (a) {
+      a = stamp(Object.assign({ id: genId("pr") }, a));
+      state.pron.push(a); cap(state.pron, CAPS.pron); save();
+      return a;
+    },
+    pron: function () { return state.pron; },
+    // Words to re-practise; deduped by word (newest note wins). Returns number added.
+    addPronWords: function (list) {
+      var added = 0, changed = false;
+      (list || []).forEach(function (x) {
+        if (!x || !x.w) return;
+        var k = String(x.w).toLowerCase().trim();
+        if (!/^[a-z' -]+$/.test(k)) return;
+        var isNew = true;
+        for (var i = 0; i < state.pronWords.length; i++) if (state.pronWords[i].w === k) { state.pronWords.splice(i, 1); isNew = false; break; }
+        state.pronWords.push({ w: k, ipa: x.ipa || "", note_ar: x.note_ar || "", source: x.source || "lab", ts: new Date().toISOString() });
+        if (isNew) added++;
+        changed = true;
+      });
+      if (changed) { cap(state.pronWords, CAPS.pronWords); save(); }
+      return added;
+    },
+    pronWords: function () { return state.pronWords; },
+    removePronWord: function (w) {
+      var k = String(w).toLowerCase();
+      for (var i = 0; i < state.pronWords.length; i++) if (state.pronWords[i].w === k) { state.pronWords.splice(i, 1); save(); return; }
+    },
 
     // Vocabulary items from evaluations: { word, gloss_ar, sentence_with_gap, correct_answer, distractors, explanation }.
     // Deduped by word (case-insensitive) against bundled + added items. Returns the number added.

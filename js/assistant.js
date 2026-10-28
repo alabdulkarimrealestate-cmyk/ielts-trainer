@@ -9,7 +9,7 @@
   "use strict";
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 
-  var ROUTE_AR = { today: "اليوم", practice: "التمارين", session: "جلسة التمارين", load: "جلسة الضغط", writing: "الكتابة",
+  var ROUTE_AR = { today: "اليوم", practice: "التمارين", session: "جلسة التمارين", load: "جلسة الضغط", writing: "الكتابة", speak: "تكلّم (مختبر النطق / امتحان المحادثة)",
                    log: "تسجيل النتائج", progress: "التقدّم", dashboard: "لوحة القواعد", plan: "الخطة", report: "تقرير AI",
                    more: "المزيد", data: "البيانات", roadmap: "خريطة القواعد", dictionary: "قاموس النطق", reference: "المرجع",
                    diagrams: "الرسوم", translate: "الترجمة" };
@@ -34,6 +34,15 @@
       var weak = (window.RULES || []).map(function (r) { return { r: r, a: Store.recentAccuracy(r.id) }; })
         .filter(function (x) { return x.a !== null; }).sort(function (a, b) { return a.a - b.a; }).slice(0, 3);
       if (weak.length) lines.push("أضعف قواعد التمرين: " + weak.map(function (x) { return x.r.label + " " + Math.round(x.a * 100) + "%"; }).join(" · "));
+      if (window.Pron && window.Pron.units().length) {
+        var pov = window.Pron.overallStats(), wu = window.Pron.weakestUnits(3);
+        lines.push("النطق (مختبر النطق، Gemini يسمع التسجيلات): " + (pov.n ? "متوسط " + pov.avg + "/100 في " + pov.n + " محاولة" : "لم يبدأ بعد") +
+          (wu.length ? " · أضعف الأصوات: " + wu.map(function (x) { return x.unit.title_ar + " " + x.stats.avg; }).join("، ") : "") +
+          (Store.pronWords().length ? " · كلمات للمراجعة: " + Store.pronWords().slice(-8).map(function (x) { return x.w; }).join(", ") : ""));
+      }
+      var lastMock = Store.speaking().filter(function (s) { return s.kind === "ai-audio"; }).slice(-1)[0];
+      if (lastMock) lines.push("آخر امتحان Speaking محاكى (" + lastMock.date + "): FC " + fmt(lastMock.bands.fluency) + " · LR " + fmt(lastMock.bands.lexical) +
+        " · GRA " + fmt(lastMock.bands.grammar) + " · P " + fmt(lastMock.bands.pronunciation) + " → " + fmt(lastMock.bands.overall));
       var tf = Tracker.errorTagFrequency(5), tk = Object.keys(tf.freq);
       if (tk.length) lines.push("أخطاء المقالات المتكررة (آخر " + tf.n + "): " + tk.map(function (k) { return k + " " + tf.freq[k]; }).join(", "));
       var lr = window.Drills && window.Drills.lastRevealed;
@@ -63,6 +72,7 @@ context()
     log:      ["كيف أحلّل أخطاء Listening بعد الاختبار؟", "ما الفرق بين False و Not Given؟"],
     plan:     ["اشرح لي مرحلتي الحالية وماذا يجب أن أنجز هذا الأسبوع", "هل خطتي واقعية مع ساعاتي؟"],
     dictionary: ["اختبرني في نطق ٣ كلمات مالية", "ما الفرق بين /ɪ/ و /iː/ بمثالين؟"],
+    speak:    ["ما أكبر مشكلة في نطقي حسب نتائجي؟", "كيف أطيل إجابتي في Part 2 بدون تردد؟", "أعطني جملة صعبة النطق أتدرّب عليها"],
     "default": ["ما أهم شيء أفعله اليوم؟", "أين أنا من الهدف 7.0؟", "اسألني سؤال تمرين"]
   };
 

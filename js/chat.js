@@ -47,7 +47,9 @@
   function cleanForSpeech(text) {
     return String(text || "").replace(/[*_#`>|]/g, " ").replace(/\s+/g, " ").trim();
   }
-  function speak(text, onDone) {
+  // opts.rate: speaking rate (pronunciation models use a slower one)
+  function speak(text, onDone, opts) {
+    opts = opts || {};
     if (!TTS) { if (onDone) onDone(); return; }
     TTS.cancel();
     var chunks = splitByScript(cleanForSpeech(text));
@@ -56,7 +58,7 @@
     function finish() { if (!done) { done = true; if (onDone) onDone(); } }
     chunks.forEach(function (c, i) {
       var u = new SpeechSynthesisUtterance(c.text);
-      u.lang = c.kind === "ar" ? "ar-EG" : "en-GB"; u.rate = 0.95;
+      u.lang = c.kind === "ar" ? "ar-EG" : "en-GB"; u.rate = opts.rate || 0.95;
       var v = pickVoice(c.kind); if (v) u.voice = v;
       if (i === chunks.length - 1) { u.onend = finish; u.onerror = finish; }
       TTS.speak(u);
