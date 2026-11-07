@@ -55,6 +55,7 @@
   function textArea(ph, rows, cls) { var t = el("textarea", "big-input " + (cls || "")); t.rows = rows || 4; if (ph) t.placeholder = ph; return t; }
   function field(label, input) { var w = el("div", "field"); w.appendChild(el("label", null, label)); w.appendChild(input); return w; }
   function aiErr(e) { return (e && (e.ar || e.message)) || "خطأ غير متوقع"; }
+  function aiLabel(base) { return base + (window.AI && AI.enabled() ? " (" + AI.providerLabel() + ")" : ""); }
   function stripCtl(s) { return String(s == null ? "" : s).replace(/[<>&"]/g, ""); }
 
   /* ---------------- mini line chart: one series + the 7.0 guide ---------------- */
@@ -330,54 +331,121 @@
     view.appendChild(wrap);
   }
 
-  // Gemini key box — the key lives only in this device's localStorage (ai.js).
+  // A paste-key → test → enable form for one provider. Used in the Plan box and
+  // inline wherever an AI button is pressed without a key (onReady runs after).
+  var PROV = {
+    claude: { name: "Claude", ph: "sk-ant-…", url: "https://console.anthropic.com/settings/keys", urlText: "console.anthropic.com/settings/keys",
+              steps: ["١. افتح Claude Console ← API Keys ← Create Key (يُخصم من رصيد Claude API لديك).", "٢. الصق المفتاح هنا (يبدأ بـ sk-ant-) واضغط «اختبر وفعّل»."] },
+    gemini: { name: "Gemini", ph: "AIza…", url: "https://aistudio.google.com/app/apikey", urlText: "aistudio.google.com/app/apikey",
+              steps: ["١. افتح Google AI Studio ← Get API key ← Create API key (مجاني).", "٢. الصق المفتاح هنا (يبدأ بـ AIza) واضغط «اختبر وفعّل»."] }
+  };
+  function keyForm(kind, onReady) {
+    var p = PROV[kind], wrap = el("div", "key-form");
+    var steps = el("div", "sync-steps");
+    steps.appendChild(el("div", null, p.steps[0]));
+    var a = el("a", "ltr", p.urlText); a.href = p.url; a.target = "_blank"; a.rel = "noopener"; steps.appendChild(a);
+    steps.appendChild(el("div", null, p.steps[1]));
+    wrap.appendChild(steps);
+    var keyIn = el("input", "reason ltr"); keyIn.type = "password"; keyIn.placeholder = p.ph; keyIn.autocomplete = "off";
+    wrap.appendChild(keyIn);
+    var status = el("div", "sync-status");
+    var en = btn("اختبر المفتاح وفعّل " + p.name, "primary wide", function () {
+      var k = keyIn.value.trim(); if (!k) { keyIn.focus(); return; }
+      en.disabled = true; en.textContent = "جارِ التحقق…"; status.textContent = ""; status.className = "sync-status";
+      AI[kind].enable(k).then(function () {
+        if (window.Assistant) window.Assistant.reset();
+        if (onReady) onReady(); else go("plan");
+      }).catch(function (e) {
+        status.textContent = "⚠ " + aiErr(e); status.className = "sync-status error";
+        en.disabled = false; en.textContent = "اختبر المفتاح وفعّل " + p.name;
+      });
+    });
+    wrap.appendChild(en); wrap.appendChild(status);
+    return wrap;
+  }
+
+  // Inline setup card: "add a key here and carry on" (default provider Claude;
+  // audio features ask for Gemini).
+  function aiSetup(onReady, opts) {
+    opts = opts || {};
+    var kind = opts.audio ? "gemini" : "claude";
+    var c = el("div", "ai-setup");
+    c.appendChild(el("div", "ai-setup-title", opts.audio
+      ? "🎧 تقييم الصوت يحتاج مفتاح Gemini (مجاني) — Claude لا يسمع الصوت. أضِفه هنا مرة واحدة على هذا الجهاز:"
+      : "🔑 أضِف مفتاح Claude مرة واحدة على هذا الجهاز وتكمل مباشرة:"));
+    c.appendChild(keyForm(kind, onReady));
+    if (!opts.audio) {
+      var alt = el("button", "link-btn", "أو استخدم مفتاح Gemini المجاني بدلًا منه"); alt.type = "button";
+      alt.onclick = function () { c.replaceChild(keyForm("gemini", onReady), c.children[1]); alt.remove(); };
+      c.appendChild(alt);
+    }
+    return c;
+  }
+
+  // The Plan screen's AI settings: Claude (text) + Gemini (listening).
   function aiBox() {
     var box = el("div", "sync-box ai-box");
-    box.appendChild(el("h3", "grp-title", "🤖 الذكاء الاصطناعي داخل التطبيق (Gemini — الطبقة المجانية)"));
-    var status = el("div", "sync-status");
-    if (AI.enabled()) {
-      status.textContent = "✓ مفعّل — النموذج: " + AI.model(); status.className = "sync-status ok";
-      box.appendChild(status);
-      var models = AI.models();
-      if (models.length) {
-        var sel = el("select", "stage-select");
-        models.forEach(function (m) { var o = el("option", null, m); o.value = m; if (m === AI.model()) o.selected = true; sel.appendChild(o); });
-        sel.onchange = function () { AI.setModel(sel.value); status.textContent = "✓ مفعّل — النموذج: " + AI.model(); };
-        box.appendChild(field("النموذج", sel));
+    box.appendChild(el("h3", "grp-title", "🤖 الذكاء الاصطناعي داخل التطبيق"));
+    box.appendChild(noteP("Claude يتولّى كل ما هو نصّ: نقاش الأخطاء، المدرّب العائم، تقييم الكتابة، التقرير. Gemini وحده يسمع الصوت: مختبر النطق وامتحان المحادثة. يكفي أحدهما للنصوص، والصوت يحتاج Gemini.", "muted-p small-p"));
+
+    // ---- Claude ----
+    var cc = el("div", "prov-card");
+    cc.appendChild(el("div", "prov-head", "🟠 Claude — للنصوص (رصيد Claude API لديك)"));
+    if (AI.claude.enabled()) {
+      var cs = el("div", "sync-status ok", "✓ مفعّل — " + AI.claude.model()); cc.appendChild(cs);
+      var csel = el("select", "stage-select");
+      var avail = AI.claude.models();
+      AI.claude.catalog.forEach(function (m) {
+        if (avail.length && avail.indexOf(m.id) === -1) return;
+        var o = el("option", null, m.ar); o.value = m.id; if (m.id === AI.claude.model()) o.selected = true; csel.appendChild(o);
+      });
+      csel.onchange = function () { AI.claude.setModel(csel.value); cs.textContent = "✓ مفعّل — " + AI.claude.model(); };
+      cc.appendChild(field("النموذج", csel));
+      cc.appendChild(btn("إيقاف وحذف مفتاح Claude من هذا الجهاز", "small", function () {
+        if (confirm("سيُحذف مفتاح Claude من هذا الجهاز فقط. متابعة؟")) { AI.claude.disable(); if (window.Assistant) window.Assistant.reset(); go("plan"); }
+      }));
+    } else {
+      cc.appendChild(keyForm("claude"));
+    }
+    box.appendChild(cc);
+
+    // ---- Gemini ----
+    var gc = el("div", "prov-card");
+    gc.appendChild(el("div", "prov-head", "🔵 Gemini — للصوت + بديل مجاني للنصوص"));
+    if (AI.gemini.enabled()) {
+      var gs = el("div", "sync-status ok", "✓ مفعّل — " + AI.gemini.model()); gc.appendChild(gs);
+      var gm = AI.gemini.models();
+      if (gm.length) {
+        var gsel = el("select", "stage-select");
+        gm.forEach(function (m) { var o = el("option", null, m); o.value = m; if (m === AI.gemini.model()) o.selected = true; gsel.appendChild(o); });
+        gsel.onchange = function () { AI.gemini.setModel(gsel.value); gs.textContent = "✓ مفعّل — " + AI.gemini.model(); };
+        gc.appendChild(field("النموذج", gsel));
       }
-      var cds = AI.cooldowns(), cdKeys = Object.keys(cds);
+      var cds = AI.gemini.cooldowns(), cdKeys = Object.keys(cds);
       if (cdKeys.length) {
         var cdBox = el("div", "export-reminder", "⏳ نماذج نفدت حصّتها المجانية مؤقتًا (يتخطّاها التطبيق تلقائيًا): " +
           cdKeys.map(function (m) { var h = Math.max(1, Math.ceil((cds[m] - Date.now()) / 3600000)); return m + " (~" + h + " س)"; }).join(" · ") + " — اضغط لإعادة المحاولة بها.");
-        cdBox.onclick = function () { AI.clearCooldowns(); go("plan"); };
-        box.appendChild(cdBox);
+        cdBox.onclick = function () { AI.gemini.clearCooldowns(); go("plan"); };
+        gc.appendChild(cdBox);
       }
-      box.appendChild(noteP("الحصص المجانية لكل نموذج على حدة؛ عند نفاد حصّة نموذج يتحوّل التطبيق تلقائيًا إلى التالي (flash-lite أوسع حصّة). لو المفتاح نفسه مستخدم في تطبيقات أخرى (ميزان/التوصيل) فحصّته مشتركة — أنشئ مفتاحًا من مشروع Google Cloud جديد لحصّة مستقلة.", "muted-p small-p"));
-      box.appendChild(btn("إيقاف وحذف المفتاح من هذا الجهاز", "small", function () {
-        if (confirm("سيُحذف المفتاح من هذا الجهاز فقط. متابعة؟")) { AI.disable(); go("plan"); }
+      gc.appendChild(btn("إيقاف وحذف مفتاح Gemini من هذا الجهاز", "small", function () {
+        if (confirm("سيُحذف مفتاح Gemini من هذا الجهاز فقط. متابعة؟")) { AI.gemini.disable(); if (window.Assistant) window.Assistant.reset(); go("plan"); }
       }));
     } else {
-      var steps = el("div", "sync-steps");
-      steps.appendChild(el("div", null, "١. افتح Google AI Studio ← Get API key ← Create API key (مجاني)."));
-      var a = el("a", "ltr", "aistudio.google.com/app/apikey"); a.href = "https://aistudio.google.com/app/apikey"; a.target = "_blank"; a.rel = "noopener";
-      steps.appendChild(a);
-      steps.appendChild(el("div", null, "٢. (يُنصح) قيّد المفتاح في Google Cloud: Application restrictions ← Websites ← أضف عنوان التطبيق."));
-      steps.appendChild(el("div", null, "٣. الصق المفتاح هنا واضغط «اختبر وفعّل»."));
-      box.appendChild(steps);
-      steps.appendChild(el("div", "pb-note-dark", "ℹ هذا مفتاح Google Gemini (يبدأ بـ AIza) — وليس توكن GitHub الذي في تبويب «البيانات» للمزامنة."));
-      var keyIn = el("input", "reason ltr"); keyIn.type = "password"; keyIn.placeholder = "AIza…"; keyIn.autocomplete = "off";
-      box.appendChild(keyIn);
-      var en = btn("اختبر المفتاح وفعّل", "primary wide", function () {
-        var k = keyIn.value.trim(); if (!k) { keyIn.focus(); return; }
-        en.disabled = true; en.textContent = "جارِ التحقق…"; status.textContent = ""; status.className = "sync-status";
-        AI.enable(k).then(function () { go("plan"); }).catch(function (e) {
-          status.textContent = "⚠ " + aiErr(e); status.className = "sync-status error";
-          en.disabled = false; en.textContent = "اختبر المفتاح وفعّل";
-        });
-      });
-      box.appendChild(en); box.appendChild(status);
+      gc.appendChild(keyForm("gemini"));
     }
-    box.appendChild(noteP("المفتاح يبقى على هذا الجهاز فقط (لا يُرفع للمستودع ولا للمزامنة). عند التقييم تُرسل مقالتك إلى Google، وقد تُستخدم بيانات الطبقة المجانية لتحسين منتجاتهم. البديل بلا إرسال: زر «انسخ برومبت لـ Claude» في كل شاشة.", "muted-p small-p"));
+    box.appendChild(gc);
+
+    // ---- which one answers text when both are set ----
+    if (AI.claude.enabled() && AI.gemini.enabled()) {
+      var ps = el("select", "stage-select");
+      [["auto", "Claude (الافتراضي)"], ["gemini", "Gemini"]].forEach(function (o) {
+        var op = el("option", null, o[1]); op.value = o[0]; if ((AI.preference() === "gemini" ? "gemini" : "auto") === o[0]) op.selected = true; ps.appendChild(op);
+      });
+      ps.onchange = function () { AI.setPreference(ps.value); if (window.Assistant) window.Assistant.reset(); };
+      box.appendChild(field("النصوص (الدردشة والتقييم) عبر", ps));
+    }
+    box.appendChild(noteP("المفاتيح تبقى على هذا الجهاز فقط (لا تُرفع للمستودع ولا للمزامنة) — أدخلها مرة على كل جهاز. ما تكتبه يُرسل لمزوّد الذكاء للتقييم. البديل بلا إرسال: زر «انسخ برومبت لـ Claude» في كل شاشة.", "muted-p small-p"));
     return box;
   }
 
@@ -493,9 +561,9 @@
     var part = el("select", "stage-select"); [["2", "Part 2"], ["3", "Part 3"], ["1", "Part 1"]].forEach(function (o) { var op = el("option", null, o[1]); op.value = o[0]; part.appendChild(op); });
     tdet.appendChild(field("الجزء", part)); tdet.appendChild(tr);
     var aiStatus = el("div", "sync-status"), resBox = el("div");
-    var aiB = btn("قيّم بالذكاء (Gemini)", "primary wide", function () {
+    var aiB = btn(aiLabel("قيّم بالذكاء"), "primary wide", function () {
       if (!tr.value.trim()) { tr.focus(); return; }
-      if (!AI.enabled()) { aiStatus.textContent = "فعّل مفتاح Gemini من «الخطة» أولًا، أو استخدم النسخ إلى Claude."; aiStatus.className = "sync-status error"; return; }
+      if (!AI.enabled()) { clear(resBox); resBox.appendChild(aiSetup(function () { clear(resBox); aiB.textContent = aiLabel("قيّم بالذكاء"); aiB.click(); })); return; }
       aiB.disabled = true; aiStatus.textContent = "جارِ التقييم…"; aiStatus.className = "sync-status syncing";
       AI.evaluateSpeakingTranscript({ transcript: tr.value.trim(), part: part.value }).then(applySp).catch(function (e) {
         aiStatus.textContent = "⚠ " + aiErr(e); aiStatus.className = "sync-status error"; aiB.disabled = false;
@@ -698,9 +766,9 @@
     // 4 · evaluate
     var vc = card("٤ · التقييم");
     var status = el("div", "sync-status");
-    var aiB = btn("قيّم بالذكاء (Gemini)", "primary wide", function () {
-      if (!AI.enabled()) { status.textContent = "فعّل مفتاح Gemini من «الخطة» أولًا، أو استخدم النسخ إلى Claude."; status.className = "sync-status error"; return; }
+    var aiB = btn(aiLabel("قيّم بالذكاء"), "primary wide", function () {
       var essay = ta.value.trim(); if (!essay) { ta.focus(); return; }
+      if (!AI.enabled()) { clear(resBox); resBox.appendChild(aiSetup(function () { clear(resBox); aiB.textContent = aiLabel("قيّم بالذكاء"); aiB.click(); })); return; }
       aiB.disabled = true; status.textContent = "جارِ التقييم… (قد يستغرق ٢٠–٤٠ ثانية)"; status.className = "sync-status syncing";
       stopTimer();
       AI.evaluateWriting({ task: state.task, prompt: promptText(), essay: essay, minutes: state.minutes }).then(showResult).catch(function (e) {
@@ -743,7 +811,7 @@
       status.className = "sync-status";
     }
     function showResult(ev) {
-      state.eval = ev; aiB.disabled = false; status.textContent = "✓ تم التقييم" + (ev.source === "gemini" ? " — Gemini" : ev.source === "claude-paste" ? " — Claude" : ""); status.className = "sync-status ok";
+      state.eval = ev; aiB.disabled = false; status.textContent = "✓ تم التقييم" + ({ gemini: " — Gemini", claude: " — Claude", "claude-paste": " — Claude (لصق)" }[ev.source] || ""); status.className = "sync-status ok";
       clear(resBox);
       var rc = el("div", "result-card");
       rc.appendChild(el("div", "result-head", "Task " + state.task + " · الإجمالي " + fmtBand(ev.bands.overall) + " · " + gapText(Math.round((ev.bands.overall - target()) * 10) / 10)));
@@ -901,8 +969,8 @@
     wrap.appendChild(noteP("يُرسل ملخّص أرقامك فقط (باندات، ساعات، دقّة التمارين، وسوم الأخطاء) — بلا نصوص مقالاتك."));
     var gc = card("تقرير جديد");
     var status = el("div", "sync-status"), out = el("div");
-    var genB = btn("🤖 أنشئ التقرير (Gemini)", "primary wide", function () {
-      if (!AI.enabled()) { status.textContent = "فعّل مفتاح Gemini من «الخطة» أولًا، أو استخدم النسخ إلى Claude."; status.className = "sync-status error"; return; }
+    var genB = btn(aiLabel("🤖 أنشئ التقرير"), "primary wide", function () {
+      if (!AI.enabled()) { clear(out); out.appendChild(aiSetup(function () { clear(out); genB.textContent = aiLabel("🤖 أنشئ التقرير"); genB.click(); })); return; }
       genB.disabled = true; status.textContent = "جارِ التحليل…"; status.className = "sync-status syncing";
       var pack = Tracker.dataPack(14);
       AI.weeklyReport(pack).then(function (rep) { saveAndShow(rep, pack); }).catch(function (e) { status.textContent = "⚠ " + aiErr(e); status.className = "sync-status error"; genB.disabled = false; });
@@ -989,5 +1057,5 @@
   ];
   window.EXTRA_VIEWS = { today: todayView, plan: planView, log: logView, writing: writingView, progress: progressView, report: reportView, more: moreView,
                          speak: function (arg) { if (window.Speak) window.Speak.view(arg); } };
-  window.PrepViews = { aiBox: aiBox, lineChart: lineChart, decisionCard: decisionCard };
+  window.PrepViews = { aiBox: aiBox, aiSetup: aiSetup, lineChart: lineChart, decisionCard: decisionCard };
 })();

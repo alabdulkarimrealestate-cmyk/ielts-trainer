@@ -1,4 +1,4 @@
-/* chat.js — in-page chat with Gemini: text + voice. Used by (a) the Socratic
+/* chat.js — in-page chat with Claude or Gemini (ai.js routes): text + voice. Used by (a) the Socratic
    error chat under a wrong answer and (b) the floating coach (assistant.js).
    Voice is the browser's own Web Speech API — dictation (SpeechRecognition:
    Chrome / Edge / Android, needs HTTPS) and read-aloud (speechSynthesis, the
@@ -79,7 +79,7 @@
     host.innerHTML = "";
     var panel = el("div", "chat-panel");
     var head = el("div", "chat-head");
-    head.appendChild(el("span", "chat-title", opts.title || "💬 ناقش الخطأ مع Gemini"));
+    head.appendChild(el("span", "chat-title", opts.title || ("💬 ناقش الخطأ مع " + ((window.AI && window.AI.enabled()) ? window.AI.providerLabel() : "AI"))));
     var tools = el("div", "chat-tools");
     var spk = el("button", "chat-tool", ""), langB = el("button", "chat-tool", ""), hf = el("button", "chat-tool", "");
     [spk, langB, hf].forEach(function (b) { b.type = "button"; tools.appendChild(b); });

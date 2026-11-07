@@ -1,4 +1,4 @@
-/* assistant.js — the floating Gemini coach, available on every screen.
+/* assistant.js — the floating AI coach (Claude or Gemini), on every screen.
    A 🤖 button opens a drawer (bottom sheet on phones) with the chat widget
    (chat.js: text + voice). Each message carries a LIVE context line-pack:
    current screen, phase, days to exam, today's tasks, bands and gaps, week
@@ -76,12 +76,14 @@ context()
     "default": ["ما أهم شيء أفعله اليوم؟", "أين أنا من الهدف 7.0؟", "اسألني سؤال تمرين"]
   };
 
-  var fab = null, drawer = null, host = null, api = null, isOpen = false;
+  var fab = null, drawer = null, host = null, api = null, isOpen = false, headTitle = null;
+  function coachName() { return (window.AI && window.AI.enabled()) ? window.AI.providerLabel() : "AI"; }
 
   function build() {
     drawer = el("div", "chat-drawer hidden");
     var head = el("div", "drawer-head");
-    head.appendChild(el("span", null, "🤖 مدرّبك Gemini"));
+    headTitle = el("span", null, "🤖 مدرّبك " + coachName());
+    head.appendChild(headTitle);
     var x = el("button", "drawer-close", "✕"); x.type = "button"; x.title = "إغلاق"; x.onclick = closeDrawer;
     head.appendChild(x);
     drawer.appendChild(head);
@@ -93,17 +95,23 @@ context()
   function renderNoKey() {
     host.innerHTML = "";
     var n = el("div", "chat-notice");
-    n.appendChild(el("p", "muted-p", "فعّل مفتاح Gemini (مجاني) مرة واحدة لتتحدّث مع مدرّبك هنا — كتابة أو صوتًا — من أي شاشة."));
-    var b = el("button", "btn primary wide", "فعّل من «الخطة»"); b.type = "button";
-    b.onclick = function () { closeDrawer(); window.App.go("plan"); };
-    n.appendChild(b);
+    n.appendChild(el("p", "muted-p", "مدرّبك يتحدّث معك هنا — كتابة أو صوتًا — من أي شاشة. أضِف المفتاح مرة واحدة وتبدأ فورًا:"));
+    if (window.PrepViews && window.PrepViews.aiSetup) {
+      // keyForm resets this drawer on success; openDrawer then starts the chat
+      n.appendChild(window.PrepViews.aiSetup(function () { openDrawer(); }));
+    } else {
+      var b = el("button", "btn primary wide", "أضِف المفتاح من «الخطة»"); b.type = "button";
+      b.onclick = function () { closeDrawer(); window.App.go("plan"); };
+      n.appendChild(b);
+    }
     host.appendChild(n);
   }
 
   function openDrawer() {
     if (!drawer) build();
     drawer.classList.remove("hidden"); isOpen = true; fab.classList.add("open"); fab.textContent = "✕";
-    if (!window.AI.enabled()) { renderNoKey(); return; }
+    headTitle.textContent = "🤖 مدرّبك " + coachName();
+    if (!window.AI.enabled()) { if (!host.firstChild) renderNoKey(); return; }
     if (!api) {
       api = window.Chat.open(host, {
         title: "اسأل عن أي شيء في تحضيرك",
@@ -124,8 +132,8 @@ context()
 
   function init() {
     if (fab) return;
-    fab = el("button", "fab-gemini", "🤖"); fab.type = "button"; fab.title = "مدرّبك Gemini — من أي شاشة";
-    fab.setAttribute("aria-label", "افتح مدرّب Gemini");
+    fab = el("button", "fab-gemini", "🤖"); fab.type = "button"; fab.title = "مدرّبك الذكي — من أي شاشة";
+    fab.setAttribute("aria-label", "افتح المدرّب الذكي");
     fab.onclick = toggle;
     document.body.appendChild(fab);
   }

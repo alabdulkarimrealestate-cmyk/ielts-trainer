@@ -206,14 +206,13 @@
       }
       feedback.appendChild(el("div", "explain", item.explanation || ""));
 
-      // Stress cards bridge knowledge -> execution: remind to read aloud NOW.
-      // (Text reminder only — actual audio practice stays in ELSA.)
       // Stress cards bridge knowledge → execution: say it now and Gemini
-      // listens (pron.js); without a microphone/key, the text reminder stays.
+      // listens (pron.js; Claude cannot hear audio). Without a key, pron.js
+      // offers the Gemini key inline; without a microphone, a text reminder.
       if (window.READ_ALOUD_RULES && window.READ_ALOUD_RULES[item.rule]) {
         if (window.Pron && window.Recorder && window.Recorder.supported()) {
           var sayTarget = item.rule === "word_stress" ? item.word : (item.words || []).join(" ");
-          var sayBtn = el("button", "btn wide pron-btn", "🎙 انطقها الآن — Gemini يسمعك ويقيّم النبر");
+          var sayBtn = el("button", "btn wide pron-btn", "🎙 انطقها الآن — يسمعك ويقيّم النبر");
           sayBtn.type = "button";
           var sayHost = el("div", "pron-host");
           sayBtn.onclick = function () {
@@ -231,26 +230,34 @@
         }
       }
 
-      // Wrong answer -> live Socratic chat with Gemini right here (text or
-      // voice), built from the user's OWN typed reasoning (the real
-      // misconception). Copy-to-Claude stays as the no-key fallback.
+      // Wrong answer -> live Socratic chat right here (Claude or Gemini, text
+      // or voice), built from the user's OWN typed reasoning (the real
+      // misconception). No key yet -> the key form opens in place and the
+      // chat starts as soon as the key works (never a dead "enable AI" end).
       if (!correct) {
         var answerTxt = ctrl.answerText(), reasonTxt = reason.value.trim();
         var chatHost = el("div", "chat-host");
-        if (window.AI && window.AI.enabled() && window.Chat) {
-          var openBtn = el("button", "btn wide chat-btn", "💬 ناقش خطأك مع Gemini الآن — كتابة أو صوت");
-          openBtn.type = "button";
-          openBtn.onclick = function () {
-            openBtn.classList.add("hidden");
-            window.Chat.openForError(chatHost, item, answerTxt, reasonTxt, function () { openBtn.classList.remove("hidden"); });
-          };
-          feedback.appendChild(openBtn);
-        } else {
-          var enableBtn = el("button", "btn wide chat-btn", "💬 فعّل Gemini لتناقش خطأك هنا (كتابة وصوت)");
-          enableBtn.type = "button";
-          enableBtn.onclick = function () { if (window.App) window.App.go("plan"); };
-          feedback.appendChild(enableBtn);
-          var copyBtn = el("button", "btn small", "أو انسخ الحوار لـ Claude");
+        var hasAI = function () { return !!(window.AI && window.AI.enabled()); };
+        var chatLbl = function () { return hasAI() ? "💬 ناقش خطأك مع " + window.AI.providerLabel() + " الآن — كتابة أو صوت" : "💬 ناقش خطأك هنا — كتابة أو صوت"; };
+        var openBtn = el("button", "btn wide chat-btn", chatLbl());
+        openBtn.type = "button";
+        var openChat = function () {
+          while (chatHost.firstChild) chatHost.removeChild(chatHost.firstChild);
+          openBtn.classList.add("hidden");
+          window.Chat.openForError(chatHost, item, answerTxt, reasonTxt, function () {
+            openBtn.textContent = chatLbl(); openBtn.classList.remove("hidden");
+          });
+        };
+        openBtn.onclick = function () {
+          if (hasAI() && window.Chat) { openChat(); return; }
+          if (!window.PrepViews || !window.PrepViews.aiSetup) { if (window.App) window.App.go("plan"); return; }
+          openBtn.classList.add("hidden");
+          while (chatHost.firstChild) chatHost.removeChild(chatHost.firstChild);
+          chatHost.appendChild(window.PrepViews.aiSetup(openChat));
+        };
+        feedback.appendChild(openBtn);
+        if (!hasAI()) {
+          var copyBtn = el("button", "btn small", "أو انسخ الحوار والصقه في Claude.ai");
           copyBtn.type = "button";
           copyBtn.onclick = function () { window.Prompts.copy(window.Prompts.errorChat(item, answerTxt, reasonTxt), copyBtn); };
           feedback.appendChild(copyBtn);

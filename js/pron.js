@@ -210,8 +210,9 @@ unit && unit.sound !== undefined ? ('Focus of this exercise: ' + (unit.ipa || ""
 
     function run() {
       clear(res);
-      if (!window.AI || !window.AI.enabled()) {
-        res.appendChild(el("div", "pron-msg", "قارن تسجيلك بالنموذج 🔊 بنفسك — أو فعّل مفتاح Gemini من «الخطة» ليسمعك ويقيّمك."));
+      if (!window.AI || !window.AI.audioEnabled()) {
+        res.appendChild(el("div", "pron-msg", "قارن تسجيلك بالنموذج 🔊 بنفسك — أو أضِف مفتاح Gemini هنا ليسمعك ويقيّم تسجيلك هذا فورًا."));
+        if (window.PrepViews && window.PrepViews.aiSetup) res.appendChild(window.PrepViews.aiSetup(function () { run(); }, { audio: true }));
         mic.reset("سجّل مرة أخرى");
         nextRow(null);
         return;
@@ -395,9 +396,9 @@ unit && unit.sound !== undefined ? ('Focus of this exercise: ' + (unit.ipa || ""
     opts = opts || {};
     clear(host);
     if (!units().length) { host.appendChild(el("p", "muted-p", "بنك الوحدات لم يُحمَّل (data/pron_units.js).")); return; }
-    if (!window.AI || !window.AI.enabled()) {
-      var n = el("div", "export-reminder", "🔑 فعّل مفتاح Gemini من «الخطة» ليسمعك ويقيّم نطقك. بدونه تستطيع التسجيل والمقارنة بالنموذج بنفسك.");
-      n.onclick = function () { window.App.go("plan"); }; host.appendChild(n);
+    if (!window.AI || !window.AI.audioEnabled()) {
+      if (window.PrepViews && window.PrepViews.aiSetup) host.appendChild(window.PrepViews.aiSetup(function () { labHome(host, opts); }, { audio: true }));
+      host.appendChild(el("p", "muted-p small-p", "بدون المفتاح تستطيع التسجيل والمقارنة بالنموذج 🔊 بنفسك."));
     }
     var ov = overallStats(), rec = recommendedUnit();
     var hero = el("div", "pron-hero");

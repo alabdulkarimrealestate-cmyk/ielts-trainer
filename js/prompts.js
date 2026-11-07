@@ -1,5 +1,5 @@
 /* prompts.js — prompt builders + the JSON contracts shared by both AI routes:
-     • in-app Gemini (ai.js, JSON mode with the schemas below), and
+     • in-app AI (ai.js: Claude structured outputs or Gemini JSON mode, same schemas), and
      • zero-cost "copy into Claude, paste the reply back" (parseJSON below).
    Both produce the same evaluation object, so the app never cares which
    route was used. Also: translation / visual / Socratic error-chat prompts. */
@@ -382,7 +382,7 @@ topic
            [item.correct_answer].concat(item.distractors || []).join(", ") + '.';
   }
 
-  // In-page Gemini chat (chat.js): system persona + the hidden opening turn.
+  // In-page AI chat (chat.js): system persona + the hidden opening turn.
   // Replies are read aloud, so they must be short and free of markdown.
   function errorChatSystem() {
     return [

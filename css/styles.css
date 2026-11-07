@@ -494,7 +494,18 @@ h1,h2,h3{margin:0 0 .4em}
 .rep-wrap summary{cursor:pointer; font-weight:600; font-size:14px}
 .ai-box .sync-steps a{color:var(--accent); font-size:13px}
 
-/* ---- in-page Gemini chat (chat.js): text + voice ---- */
+/* ---- AI keys: provider cards + inline "add a key here" setup ---- */
+.prov-card{border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0}
+.prov-head{font-weight:700; font-size:15px; margin-bottom:4px}
+.key-form .sync-steps a{color:var(--accent); font-size:13px; word-break:break-all}
+.key-form .reason{margin:6px 0 8px}
+.ai-setup{border:1.5px dashed var(--accent); border-radius:14px; background:var(--card); padding:12px 14px; margin:10px 0}
+.ai-setup-title{font-weight:700; font-size:14px; line-height:1.8}
+.link-btn{background:none; border:0; padding:6px 0; margin-top:4px; color:var(--accent); font:inherit; font-size:13px;
+  text-decoration:underline; cursor:pointer}
+.chat-notice .ai-setup{margin:8px 0 0}
+
+/* ---- in-page AI chat (chat.js): text + voice ---- */
 .chat-host{margin-top:10px}
 .chat-panel{border:1px solid var(--accent); border-radius:14px; background:var(--card); padding:10px; margin-top:8px}
 .chat-head{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px}

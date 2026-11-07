@@ -518,7 +518,7 @@
     /* ---- auto-sync (GitHub Gist) ---- */
     var syncBox = el("div", "sync-box");
     syncBox.appendChild(el("h3", "grp-title", "☁ المزامنة التلقائية بين الأجهزة (توكن GitHub)"));
-    var notGemini = el("div", "export-reminder", "⚠ هذا الصندوق لتوكن GitHub الخاص بالمزامنة فقط — مفتاح Gemini (AIza…) مكانه في تبويب «الخطة» ▸ الذكاء الاصطناعي. اضغط هنا للانتقال.");
+    var notGemini = el("div", "export-reminder", "⚠ هذا الصندوق لتوكن GitHub الخاص بالمزامنة فقط — مفاتيح الذكاء الاصطناعي (Claude: sk-ant-… / Gemini: AIza…) مكانها في تبويب «الخطة» ▸ الذكاء الاصطناعي. اضغط هنا للانتقال.");
     notGemini.onclick = function () { go("plan"); };
     syncBox.appendChild(notGemini);
 
@@ -672,17 +672,26 @@
           '<span class="lg-mark">' + (e.correct ? "✓" : "✗") + '</span></div>' +
           '<div class="lg-ans ltr">إجابتك: ' + escapeHtml(e.answer) + '</div>' +
           '<div class="lg-reason">سببك: ' + escapeHtml(e.reasoning || "—") + '</div>';
-        // Old mistakes stay discussable: live Gemini chat in place, or the
-        // copy-to-Claude prompt when no key is set.
+        // Old mistakes stay discussable: live AI chat in place; with no key
+        // the key form opens right here and the chat starts once it works.
         if (!e.correct) {
           var it = window.ALL_ITEMS.filter(function (x) { return x.id === e.itemId; })[0];
           if (it) {
-            var cb = el("button", "btn small chat-btn", (window.AI && window.AI.enabled()) ? "💬 ناقش هذا الخطأ مع Gemini" : "💬 انسخ الحوار لـ Claude");
+            var aiOn = function () { return !!(window.AI && window.AI.enabled()); };
+            var cb = el("button", "btn small chat-btn", aiOn() ? "💬 ناقش هذا الخطأ مع " + window.AI.providerLabel() : "💬 ناقش هذا الخطأ");
             var host = el("div", "chat-host");
+            var startChat = function () {
+              host.innerHTML = ""; cb.classList.add("hidden");
+              window.Chat.openForError(host, it, e.answer, e.reasoning, function () { cb.classList.remove("hidden"); });
+            };
             cb.onclick = function () {
-              if (window.AI && window.AI.enabled() && window.Chat) {
-                cb.classList.add("hidden");
-                window.Chat.openForError(host, it, e.answer, e.reasoning, function () { cb.classList.remove("hidden"); });
+              if (aiOn() && window.Chat) { startChat(); return; }
+              if (window.PrepViews && window.PrepViews.aiSetup) {
+                cb.classList.add("hidden"); host.innerHTML = "";
+                host.appendChild(window.PrepViews.aiSetup(startChat));
+                var cp = el("button", "btn small", "أو انسخ الحوار والصقه في Claude.ai"); cp.type = "button";
+                cp.onclick = function () { window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cp); };
+                host.appendChild(cp);
               } else {
                 window.Prompts.copy(window.Prompts.errorChat(it, e.answer, e.reasoning), cb);
               }
@@ -776,7 +785,7 @@
     });
     document.body.appendChild(bottom);
 
-    // the floating Gemini coach, on every screen
+    // the floating AI coach (Claude or Gemini), on every screen
     if (window.Assistant) window.Assistant.init();
 
     document.addEventListener("mouseup", function () { setTimeout(updateFloat, 10); });

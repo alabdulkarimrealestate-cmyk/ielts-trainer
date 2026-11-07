@@ -286,10 +286,12 @@
     function evaluate(partNo, qs) {
       clear(host);
       host.appendChild(el("h2", "page-title", "🎤 Part " + partNo + " — التقييم"));
-      if (!window.AI || !window.AI.enabled()) {
-        host.appendChild(el("p", "muted-p", "فعّل مفتاح Gemini من «الخطة» ليستمع الممتحن لإجاباتك ويقيّمها. يمكنك الاستماع لتسجيلاتك الآن:"));
+      if (!window.AI || !window.AI.audioEnabled()) {
+        // Keep the recordings: add the Gemini key right here, then evaluate them.
+        if (window.PrepViews && window.PrepViews.aiSetup) host.appendChild(window.PrepViews.aiSetup(function () { evaluate(partNo, qs); }, { audio: true }));
+        else host.appendChild(btn("أضِف مفتاح Gemini", "primary wide", function () { window.App.go("plan"); }));
+        host.appendChild(el("p", "muted-p", "تسجيلاتك محفوظة في هذه الصفحة — استمع لها الآن، وتُقيَّم فور إضافة المفتاح:"));
         qs.forEach(function (q, i) { if (!q.rec) return; host.appendChild(el("div", "tr-q ltr", "Q" + (i + 1) + ": " + q.q)); var a = document.createElement("audio"); a.controls = true; a.src = q.rec.url; host.appendChild(a); });
-        host.appendChild(btn("فعّل Gemini", "primary wide", function () { window.App.go("plan"); }));
         return;
       }
       var wait = el("div", "pron-msg listening", "🎧 الممتحن يستمع إلى " + qs.filter(function (q) { return q.rec; }).length + " إجابة… (٢٠–٦٠ ثانية)");
@@ -343,9 +345,9 @@
   function mockHome(host, arg) {
     arg = arg || {};
     clear(host);
-    if (!window.AI || !window.AI.enabled()) {
-      var n = el("div", "export-reminder", "🔑 فعّل مفتاح Gemini من «الخطة» ليستمع الممتحن لإجاباتك ويقيّمها.");
-      n.onclick = function () { window.App.go("plan"); }; host.appendChild(n);
+    if (!window.AI || !window.AI.audioEnabled()) {
+      if (window.PrepViews && window.PrepViews.aiSetup) host.appendChild(window.PrepViews.aiSetup(function () { mockHome(host, arg); }, { audio: true }));
+      host.appendChild(el("p", "muted-p small-p", "تقدر تبدأ الامتحان الآن، وتضيف المفتاح عند التقييم — تسجيلاتك لا تضيع."));
     }
     var intro = el("div", "pcard");
     intro.appendChild(el("h3", "pcard-title", "🎤 امتحان Speaking محاكى — ممتحن يسمعك"));
