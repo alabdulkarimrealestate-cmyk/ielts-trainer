@@ -53,7 +53,12 @@
     return s;
   }
 
+  function ymdLocal(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
   function upgrade(s) {
+    if (!s.rules || typeof s.rules !== "object") s.rules = {};
     // migrate pre-roadmap data: old log entries were all calm-mode
     if (!s.leitner) s.leitner = {};
     if (!s.stageStatus) s.stageStatus = {};
@@ -67,6 +72,49 @@
     if (!s.plan.ruleWeights || typeof s.plan.ruleWeights !== "object") s.plan.ruleWeights = {};
     s.log.forEach(function (e) { if (!e.mode) e.mode = "calm"; });
     s.sessions.forEach(function (e) { if (!e.mode) e.mode = "calm"; });
+
+    // v1 (June 2026, SAME storage key): attempts lived in `history` (ts in ms,
+    // no date) and were never moved into `log`. Copy them over once (history
+    // itself is kept). Found on Ahmed's phone 2026-11-07.
+    if (Array.isArray(s.history) && s.history.length && !s.v1HistoryMigrated) {
+      var seen = {};
+      s.log.forEach(function (e) { seen[e.itemId + "|" + e.ts] = true; });
+      var moved = [];
+      s.history.forEach(function (h) {
+        if (!h || !h.rule) return;
+        var ms = typeof h.ts === "number" ? h.ts : Date.parse(h.ts);
+        var d = new Date(isFinite(ms) ? ms : Date.now());
+        var e = { ts: d.toISOString(), date: ymdLocal(d), itemId: h.itemId, rule: h.rule, mode: "calm",
+                  answer: h.answer == null ? "" : String(h.answer), reasoning: h.reasoning ? String(h.reasoning) : "", correct: !!h.correct };
+        if (!seen[e.itemId + "|" + e.ts]) moved.push(e);
+      });
+      if (moved.length) {
+        s.log = moved.concat(s.log);
+        s.log.sort(function (a, b) { return String(a.ts) < String(b.ts) ? -1 : String(a.ts) > String(b.ts) ? 1 : 0; });
+      }
+      s.v1HistoryMigrated = true;
+    }
+
+    // Every rule stat in the current shape. v1 stats were
+    // { attempts, correct, streak, last } — no `recent` → readers crashed
+    // (storage.js recentAccuracy, the stuck drill card). Rebuild `recent`
+    // from the log; keep the counts.
+    Object.keys(s.rules).forEach(function (id) {
+      var r = s.rules[id];
+      if (!r || typeof r !== "object") r = s.rules[id] = blankRule();
+      r.attempts = Number(r.attempts) || 0;
+      r.correct = Number(r.correct) || 0;
+      r.streak = Number(r.streak) || 0;
+      if (!r.lastPracticed && r.last) {
+        var lm = typeof r.last === "number" ? r.last : Date.parse(r.last);
+        r.lastPracticed = isFinite(lm) ? ymdLocal(new Date(lm)) : null;
+      }
+      if (r.lastPracticed === undefined) r.lastPracticed = null;
+      if (!Array.isArray(r.recent)) {
+        r.recent = s.log.filter(function (e) { return e && e.rule === id; }).slice(-20)
+                        .map(function (e) { return e.correct ? 1 : 0; });
+      }
+    });
     return s;
   }
 
@@ -217,7 +265,7 @@
     // Recent accuracy (last N attempts) — drives session weighting.
     recentAccuracy: function (ruleId) {
       var r = state.rules[ruleId];
-      if (!r || r.recent.length === 0) return null;
+      if (!r || !Array.isArray(r.recent) || r.recent.length === 0) return null;
       var sum = r.recent.reduce(function (a, b) { return a + b; }, 0);
       return sum / r.recent.length;
     },
