@@ -363,6 +363,40 @@ h1,h2,h3{margin:0 0 .4em}
 .task-unit{font-size:12px; color:var(--muted)}
 .task-act{flex:0 0 auto; white-space:nowrap}
 
+/* today: one card per study step — target, live progress, how, links */
+.day-steps{display:flex; flex-direction:column; gap:10px; margin-top:10px}
+.day-step{border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--bg)}
+.day-step.optional{border-style:dashed}
+.day-step.done{border-color:var(--good)}
+.day-step.done .ds-title{color:var(--muted)}
+.ds-head{display:flex; align-items:flex-start; gap:10px}
+.ds-num{flex:0 0 28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700;
+  display:flex; align-items:center; justify-content:center; font-size:14px}
+.day-step.done .ds-num{background:var(--good)}
+.ds-title{flex:1; min-width:0; font-weight:700; font-size:15px; line-height:1.6}
+.ds-min{flex:0 0 auto; font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:2px 8px; white-space:nowrap}
+.ds-target{margin:8px 0 0; font-size:14px; line-height:1.7; color:var(--ink)}
+.ds-prog{margin-top:6px}
+.ds-bar{height:7px; background:var(--line); border-radius:99px; overflow:hidden}
+.ds-bar span{display:block; height:100%; background:var(--accent); border-radius:99px}
+.ds-prog.met .ds-bar span{background:var(--good)}
+.ds-ptxt{font-size:12px; color:var(--muted); margin-top:3px}
+.ds-prog.met .ds-ptxt{color:var(--good)}
+.ds-how{font-size:13px; color:var(--muted); line-height:1.7; margin-top:6px}
+.ds-links{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+.ext-link{display:inline-flex; align-items:center; min-height:36px; padding:6px 12px; border:1px solid var(--accent); border-radius:10px;
+  color:var(--accent); text-decoration:none; font-size:13px; font-weight:600; line-height:1.4}
+.ext-link:active{background:var(--accent); color:#fff}
+.ds-foot{display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:8px; border-top:1px dashed var(--line)}
+.ds-chk-lbl{flex:1; font-size:13px; color:var(--muted); cursor:pointer}
+.day-done{margin-top:8px; font-weight:700; color:var(--good)}
+.ds-section{margin:8px 0 0; padding-top:10px; border-top:2px solid var(--line); font-weight:700; font-size:14px; color:var(--warn); line-height:1.7}
+/* drill: error reported but the learner can still move on */
+.save-warn{margin:8px 0; padding:8px 10px; border-radius:10px; border:1px solid var(--warn); color:var(--warn); font-size:13px; line-height:1.6}
+.err-bar{position:fixed; top:0; left:0; right:0; z-index:60; background:var(--bad); color:#fff; font-size:13px; line-height:1.6;
+  padding:8px 14px; cursor:pointer; direction:rtl}
+@media (max-width:640px){ .ext-link,.ds-links .btn{min-height:44px} }
+
 /* decision card */
 .decision-card{border-color:var(--warn)}
 .diag-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:8px}

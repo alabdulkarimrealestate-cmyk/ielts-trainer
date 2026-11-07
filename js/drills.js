@@ -177,21 +177,28 @@
       revealBtn.disabled = !(ctrl.answered() && reason.value.trim().length > 0);
     }
 
+    // Whatever fails after the reveal (saving on an odd device state, an
+    // optional widget), the learner must ALWAYS get the feedback and the
+    // "Next" button — a stuck card was reported on a phone (2026-11-07).
     revealBtn.onclick = function () {
       if (revealBtn.disabled) return;
-      var correct = ctrl.grade();
-      ctrl.lock();
-      ctrl.revealCorrect();
+      revealBtn.disabled = true;               // no double-tap double-record
+      var correct = false, fault = null;
+      function keep(e) { if (!fault) fault = e; try { console.error(e); } catch (x) {} }
+      try { correct = !!ctrl.grade(); } catch (e) { keep(e); }
+      try { ctrl.lock(); ctrl.revealCorrect(); } catch (e) { keep(e); }
       reason.disabled = true;
       revealBtn.classList.add("hidden");
 
-      Store.record(item, correct, ctrl.answerText(), reason.value.trim(), opts.mode || "calm");
+      try { Store.record(item, correct, ctrl.answerText(), reason.value.trim(), opts.mode || "calm"); }
+      catch (e) { keep(e); }
       // the floating coach (assistant.js) reads this to talk about the item on screen
       window.Drills.lastRevealed = { item: item, answer: ctrl.answerText(), reasoning: reason.value.trim(), correct: correct,
                                      visible: function () { return card.isConnected; } };
 
       feedback.classList.remove("hidden");
       feedback.classList.add(correct ? "ok" : "bad");
+      try {
       var badge = el("div", "verdict", correct ? "✓ إجابة صحيحة" : "✗ إجابة غير صحيحة");
       feedback.appendChild(badge);
 
@@ -265,11 +272,17 @@
         feedback.appendChild(chatHost);
       }
 
+      } catch (e) { keep(e); }
+      if (fault) {
+        feedback.appendChild(el("div", "save-warn",
+          "⚠ حصل خطأ في هذا السؤال (" + String((fault && fault.message) || fault).slice(0, 140) +
+          ") — كمّل عادي، ولو تكرّر صوّر الشاشة وابعتها."));
+      }
       var next = el("button", "btn wide", "التالي ⟵");
       next.type = "button";
       next.onclick = function () { onNext(correct); };
       feedback.appendChild(next);
-      next.focus();
+      try { next.focus(); } catch (e) {}
     };
   }
 

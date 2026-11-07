@@ -788,6 +788,23 @@
     // the floating AI coach (Claude or Gemini), on every screen
     if (window.Assistant) window.Assistant.init();
 
+    // Phones have no console: show this app's own uncaught errors as a small
+    // dismissible line so a screenshot tells us what broke.
+    window.addEventListener("error", function (ev) {
+      try {
+        var f = String(ev.filename || "");
+        if (f && f.indexOf(location.origin) !== 0 && f.indexOf("file:") !== 0) return;   // extensions etc.
+        var bar = document.getElementById("err-bar");
+        if (!bar) {
+          bar = el("div", "err-bar"); bar.id = "err-bar";
+          bar.onclick = function () { bar.parentNode.removeChild(bar); };
+          document.body.appendChild(bar);
+        }
+        bar.textContent = "⚠ خطأ في التطبيق: " + String(ev.message || "").slice(0, 160) +
+          " (" + (f.split("/").pop().split("?")[0] || "?") + ":" + (ev.lineno || 0) + ") — اضغط للإخفاء، ولو تكرّر صوّره وابعته.";
+      } catch (e) { /* never let the reporter itself break the app */ }
+    });
+
     document.addEventListener("mouseup", function () { setTimeout(updateFloat, 10); });
     document.addEventListener("selectionchange", function () { setTimeout(updateFloat, 10); });
 

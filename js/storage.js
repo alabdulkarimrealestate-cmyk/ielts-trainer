@@ -141,9 +141,15 @@
     // mode: "calm" (default) or "load" — tracked separately per rule.
     record: function (item, isCorrect, answerText, reasoning, mode) {
       mode = mode || "calm";
+      // repair any malformed stats/collections (old or merged data) instead of throwing
+      if (!state.rules || typeof state.rules !== "object") state.rules = {};
+      if (!state.leitner || typeof state.leitner !== "object") state.leitner = {};
+      if (!Array.isArray(state.log)) state.log = [];
       var r = state.rules[item.rule];
-      if (!r) { r = blankRule(); state.rules[item.rule] = r; }
-      r.attempts += 1;
+      if (!r || typeof r !== "object") { r = blankRule(); state.rules[item.rule] = r; }
+      if (!Array.isArray(r.recent)) r.recent = [];
+      r.attempts = (Number(r.attempts) || 0) + 1;
+      r.correct = Number(r.correct) || 0; r.streak = Number(r.streak) || 0;
       if (isCorrect) { r.correct += 1; r.streak += 1; }
       else { r.streak = 0; }
       r.lastPracticed = todayStr();
@@ -151,7 +157,8 @@
       if (r.recent.length > 20) r.recent.shift();
 
       // Leitner: correct → up a box (max 5), wrong → back to box 1
-      var lt = state.leitner[item.id] || { box: 0, due: todayStr() };
+      var lt = state.leitner[item.id];
+      if (!lt || typeof lt !== "object") lt = { box: 0, due: todayStr() };
       lt.box = isCorrect ? Math.min(5, (lt.box || 0) + 1) : 1;
       var gaps = { 1: 0, 2: 1, 3: 3, 4: 7, 5: 14 };
       var d = new Date(); d.setDate(d.getDate() + gaps[lt.box]);

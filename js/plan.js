@@ -121,6 +121,10 @@
     return sum;
   }
 
+  // Day 1 = the plan's start (data/plan.js `start`, Ahmed: 2026-11-07).
+  function startDate() { return P.start || today(); }
+  function dayNumber(date) { return daysBetween(startDate(), date || today()) + 1; }
+
   function weeklyTargets(phase) { return (phase && phase.weekly_targets) || {}; }
 
   // Lowest diagnostic band → booking rule (first match wins; rules sorted desc by min).
@@ -136,6 +140,6 @@
     phaseFor: phaseFor, phaseById: phaseById, phaseRange: phaseRange, phases: function () { return P.phases; },
     hoursFor: hoursFor, weekStart: weekStart, weekEnd: weekEnd, weekIndex: weekIndex,
     tasksFor: tasksFor, taskKey: taskKey, plannedMinutes: plannedMinutes,
-    weeklyTargets: weeklyTargets, decision: decision
+    weeklyTargets: weeklyTargets, decision: decision, start: startDate, dayNumber: dayNumber
   };
 })();

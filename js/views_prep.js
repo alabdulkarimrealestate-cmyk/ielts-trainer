@@ -160,7 +160,10 @@
     var banner = el("div", "phase-banner");
     var top = el("div", "pb-top");
     top.appendChild(el("div", "pb-name", ph.name_ar || ph.id));
-    top.appendChild(el("div", "pb-week", WEEKDAY_AR[Plan.weekday(date)] + " · " + date + (wk.weekIndex > 0 ? " · الأسبوع " + wk.weekIndex : "")));
+    var dn = Plan.dayNumber ? Plan.dayNumber(date) : 0;
+    top.appendChild(el("div", "pb-week", WEEKDAY_AR[Plan.weekday(date)] + " · " + date +
+      (dn >= 1 ? " · اليوم " + dn + " من خطتك" : " · الخطة تبدأ " + Plan.start()) +
+      (wk.weekIndex > 0 ? " · الأسبوع " + wk.weekIndex : "")));
     banner.appendChild(top);
     if (ph.focus_ar) banner.appendChild(el("div", "pb-focus", ph.focus_ar));
     var dte = Plan.daysToExam(date);
@@ -185,31 +188,83 @@
     var diag = Tracker.diagnosticBands();
     if ((ph.id === "diagnostic" || diag.complete) && !Plan.examDateIsSet()) wrap.appendChild(decisionCard(diag, true));
 
-    // checklist
+    // ---- today's targets: study the whole day from this one card ----
     var tasks = Plan.tasksFor(date);
-    var tc = card("مهام اليوم");
-    if (!tasks.length) tc.appendChild(noteP("لا مهام مخطّطة اليوم — جلسة القواعد ١٥ دقيقة تبقى خيارًا جيدًا."));
-    var list = el("div", "task-list");
+    var req = 0, doneN = 0, planMin = 0, doneMin = 0;
     tasks.forEach(function (t) {
-      var st = Store.taskState(t.key) || {};
-      var row = el("div", "task-row" + (st.done ? " done" : "") + (t.optional ? " optional" : ""));
+      var st = Store.taskState(t.key);
+      var pr = Tracker.taskProgress ? Tracker.taskProgress(t, date) : null;
+      // target reached in the records and never ticked/unticked by hand → tick it
+      if (pr && pr.met && !st && !overridden) { Store.setTask(t.key, { done: true, minutes: t.min || 0 }); st = Store.taskState(t.key); }
+      t._st = st || {}; t._pr = pr;
+      if (t.optional || t.scope === "diagnostic") return;   // week one-offs are not "today's" load
+      req++; planMin += t.min || 0;
+      if (t._st.done) { doneN++; doneMin += Number(t._st.minutes) || t.min || 0; }
+    });
+    var tc = card("🎯 مستهدفات اليوم — ذاكر من هنا خطوة بخطوة", "day-card");
+    if (!tasks.length) tc.appendChild(noteP(Plan.dayNumber && Plan.dayNumber(date) < 1
+      ? "الخطة تبدأ " + Plan.start() + "." : "لا مهام مخطّطة اليوم — جلسة القواعد ١٥ دقيقة تبقى خيارًا جيدًا."));
+    if (req) tc.appendChild(meter(doneMin, planMin, "أنجزت " + doneN + " من " + req + " مهام · " + doneMin + " من " + planMin + " دقيقة"));
+    if (req && doneN >= req) tc.appendChild(el("div", "day-done", "🎉 خلّصت مستهدفات اليوم — أي إضافة الآن مكسب."));
+    var list = el("div", "day-steps");
+    var n = 0, diagHead = false;
+    var diagLeft = tasks.filter(function (t) { return t.scope === "diagnostic" && !t._st.done; }).length;
+    tasks.sort(function (a, b) { return (a.scope === "diagnostic" ? 1 : 0) - (b.scope === "diagnostic" ? 1 : 0); });
+    tasks.forEach(function (t) {
+      if (t.scope === "diagnostic" && !diagHead) {
+        diagHead = true;
+        list.appendChild(el("div", "ds-section", "📋 مهام أسبوع التشخيص — وزّعها على أيام الأسبوع (باقي " + diagLeft + ")، وكل واحدة تختفي بعد إنجازها"));
+      }
+      var st = t._st, pr = t._pr;
+      var step = el("div", "day-step" + (st.done ? " done" : "") + (t.optional ? " optional" : ""));
+      var head = el("div", "ds-head");
+      head.appendChild(el("span", "ds-num", st.done ? "✓" : String(++n)));
+      head.appendChild(el("div", "ds-title", t.label_ar + (t.optional ? " (اختياري)" : "")));
+      if (t.min) head.appendChild(el("span", "ds-min", t.min + " د"));
+      step.appendChild(head);
+      if (t.target_ar) step.appendChild(el("div", "ds-target", "🎯 " + t.target_ar));
+      if (pr) {
+        var pw = el("div", "ds-prog" + (pr.met ? " met" : ""));
+        var bar = el("div", "ds-bar"), fill = el("span");
+        fill.style.width = Math.min(100, Math.round(pr.have / Math.max(1, pr.need) * 100)) + "%";
+        bar.appendChild(fill); pw.appendChild(bar);
+        pw.appendChild(el("div", "ds-ptxt", (pr.met ? "✓ " : "") + pr.text));
+        step.appendChild(pw);
+      }
+      if (t.how_ar) step.appendChild(el("div", "ds-how", t.how_ar));
+
+      var links = el("div", "ds-links");
+      var lbl = actionLabel(t.action);
+      if (lbl) links.appendChild(btn("▶ " + lbl, "primary small", function () { runAction(t); }));
+      (t.links || []).forEach(function (lk) {
+        if (lk.route) {
+          links.appendChild(btn(lk.label, "small", function () {
+            if (lk.route === "coach") { if (window.Assistant) window.Assistant.open(); return; }
+            go(lk.route, lk.arg);
+          }));
+        } else if (lk.url) {
+          var a = el("a", "ext-link", lk.label + " ↗"); a.href = lk.url; a.target = "_blank"; a.rel = "noopener";
+          links.appendChild(a);
+        }
+      });
+      if (links.firstChild) step.appendChild(links);
+
+      // done + minutes (ticked automatically when the records show the target)
+      var foot = el("div", "ds-foot");
       var chk = el("input"); chk.type = "checkbox"; chk.className = "task-chk"; chk.checked = !!st.done;
+      chk.id = "chk-" + t.key.replace(/[^a-z0-9_-]/gi, "_");
+      var cl = el("label", "ds-chk-lbl", st.done ? "تمّت" : "علّمها كمنجزة"); cl.htmlFor = chk.id;
+      var minIn = numInput(st.minutes != null && st.done ? st.minutes : t.min, 0, 600);
+      minIn.className = "task-min ltr"; minIn.title = "الدقائق";
       chk.onchange = function () {
         Store.setTask(t.key, { done: chk.checked, minutes: chk.checked ? (Number(minIn.value) || t.min || 0) : (Number(minIn.value) || 0) });
         go("today");
       };
-      var main = el("div", "task-main");
-      main.appendChild(el("div", "task-lbl", t.label_ar + (t.optional ? " (اختياري)" : "")));
-      var sub = el("div", "task-sub");
-      var minIn = numInput(st.minutes != null && st.done ? st.minutes : t.min, 0, 600);
-      minIn.className = "task-min ltr"; minIn.title = "الدقائق";
       minIn.onchange = function () { if (st.done || chk.checked) Store.setTask(t.key, { done: true, minutes: Number(minIn.value) || 0 }); };
-      sub.appendChild(minIn); sub.appendChild(el("span", "task-unit", "د"));
-      main.appendChild(sub);
-      row.appendChild(chk); row.appendChild(main);
-      var lbl = actionLabel(t.action);
-      if (lbl) row.appendChild(btn(lbl, "small task-act", function () { runAction(t); }));
-      list.appendChild(row);
+      foot.appendChild(chk); foot.appendChild(cl);
+      foot.appendChild(minIn); foot.appendChild(el("span", "task-unit", "د"));
+      step.appendChild(foot);
+      list.appendChild(step);
     });
     tc.appendChild(list);
     wrap.appendChild(tc);

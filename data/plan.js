@@ -10,7 +10,8 @@
  * (weekday numbers: 0=Sun … 6=Sat; Kuwait weekend = Fri/Sat).
  *
  * Task shape:
- *   { id, skill, label_ar, min, kind, action, logs?, optional?, days?, every_weeks? }
+ *   { id, skill, label_ar, min, kind, action, logs?, optional?, days?, every_weeks?,
+ *     target_ar?, how_ar?, links?, goal? }   <- the daily-target fields (see T below)
  *   action: "session" | "load" | "rule:<ruleId>" | "writing:1" | "writing:2" |
  *           "log:exam" | "log:speaking" | "cards" | "none"
  *   optional: true  → shown but NOT counted in planned minutes.
@@ -19,31 +20,97 @@
  * Phase `to: null` means "until the exam date" (exam_mode) or open-ended.
  * ========================================================================== */
 (function () {
+  /* External study links (each checked to open, 2026-11-07). A link is
+     { label, url } (opens a new tab) or { label, route, arg } (a screen here). */
+  var L = {
+    bbc6:      { label: "BBC 6 Minute English", url: "https://www.bbc.co.uk/learningenglish/english/features/6-minute-english" },
+    tests:     { label: "اختبارات مجانية بشكل الكمبيوتر (IELTS Online Tests)", url: "https://ieltsonlinetests.com/ielts-exam-library" },
+    lizL:      { label: "IELTS Liz — نصائح Listening", url: "https://ieltsliz.com/ielts-listening/" },
+    lizR:      { label: "IELTS Liz — نصائح Reading", url: "https://ieltsliz.com/ielts-reading-lessons-information-and-tips/" },
+    simon:     { label: "IELTS Simon — نماذج مقالات", url: "https://ielts-simon.com" },
+    official:  { label: "تجربة الامتحان الرسمية (ielts.org)", url: "https://ielts.org/take-a-test/preparation-resources" },
+    idp:       { label: "IDP — التحضير", url: "https://ielts.idp.com/prepare" },
+    italki:    { label: "italki — احجز حصة", url: "https://www.italki.com" },
+    underhill: { label: "Adrian Underhill — فيديوهات الأصوات", url: "https://www.youtube.com/results?search_query=adrian+underhill+pronunciation" },
+    coach:     { label: "🤖 اسأل المدرّب", route: "coach" },
+    progress:  { label: "📈 أخطاؤك المتكررة", route: "progress" },
+    history:   { label: "🗂 سجل النتائج", route: "log", arg: { tab: "history" } }
+  };
+
+  /* Each task also carries the day's measurable target:
+       target_ar: what "done well" means today · how_ar: the steps
+       links: where to study (external ↗ or a screen in the app)
+       goal: { metric, n, skill?, task? } — progress read from your records:
+         pron (lab attempts today) · vocab / drill (questions answered today)
+         exam (L/R score logged today, optional skill) · exam_lr (both L and R)
+         writing (essays today, task 1|2) · mock (AI-examiner speaking) · tutor */
   var T = {
-    pron:        { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — جولة الصوت المقترح (Gemini يسمعك)", min: 20, kind: "pron", action: "pron" },
-    pron10:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — جولة قصيرة", min: 10, kind: "pron", action: "pron" },
-    pron15:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — كلماتي للمراجعة", min: 15, kind: "pron", action: "pron:my_words" },
-    vocab:       { id: "vocab",       skill: "vocabulary", label_ar: "مفردات أكاديمية — بطاقات AWL", min: 15, kind: "vocab",    action: "rule:vocab_awl" },
-    grammar:     { id: "grammar",     skill: "writing",    label_ar: "جلسة القواعد ١٥ دقيقة (فكّر قبل الكشف)", min: 15, kind: "drill", action: "session", optional: true },
-    podcast:     { id: "podcast",     skill: "listening",  label_ar: "بودكاست إنجليزي في الطريق (لا يُحسب من الساعات)", min: 0, kind: "listen", action: "none", optional: true },
-    listen2sec:  { id: "listen_2sec", skill: "listening",  label_ar: "Listening: قسمان + مراجعة الأخطاء", min: 40, kind: "practice", action: "log:exam", logs: "exam" },
-    listen20:    { id: "listen_20",   skill: "listening",  label_ar: "Listening ٢٠ دقيقة", min: 20, kind: "practice", action: "log:exam", logs: "exam" },
-    t1timed:     { id: "t1_timed",    skill: "writing",    label_ar: "Writing Task 1 بالتوقيت (٢٠ د) + تقييم", min: 30, kind: "writing", action: "writing:1", logs: "writing" },
-    readPassage: { id: "read_passage", skill: "reading",   label_ar: "Reading: passage واحدة + تحليل كل غلطة", min: 40, kind: "practice", action: "log:exam", logs: "exam" },
-    t2write:     { id: "t2_write",    skill: "writing",    label_ar: "Writing Task 2: تخطيط + كتابة (٤٠ د)", min: 40, kind: "writing", action: "writing:2", logs: "writing" },
-    speakCards:  { id: "speak_cards", skill: "speaking",   label_ar: "Speaking Part 2 محاكى: بطاقة مسجّلة يقيّمها الممتحن (كرّرها حتى ٣ بطاقات)", min: 40, kind: "speaking", action: "mock:2" },
-    lrTest:      { id: "lr_test",     skill: "listening",  label_ar: "امتحان Listening + Reading كامل بالتوقيت + سجل الأخطاء", min: 120, kind: "test", action: "log:exam", logs: "exam" },
-    t2rewrite:   { id: "t2_timed_rewrite", skill: "writing", label_ar: "Task 2 بالتوقيت + إعادة كتابته بعد التقييم", min: 90, kind: "writing", action: "writing:2", logs: "writing" },
-    italki:      { id: "italki",      skill: "speaking",   label_ar: "حصة italki (٣٠ د) — سجّل الباندات من المدرّس", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking" },
-    fullTest:    { id: "full_test",   skill: "all",        label_ar: "امتحان كامل على الكمبيوتر (L+R+W) بالتوقيت", min: 180, kind: "test", action: "log:exam", logs: "exam" },
-    mockSpeak:   { id: "mock_speaking", skill: "speaking", label_ar: "Mock Speaking مع المدرّس", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking" },
-    cdFormat:    { id: "cd_format",   skill: "all",        label_ar: "تدريب على شكل الامتحان على الكمبيوتر (CD familiarisation)", min: 40, kind: "practice", action: "none" },
-    errReview:   { id: "error_review", skill: "all",       label_ar: "مراجعة سجل الأخطاء الأسبوعي", min: 60, kind: "review", action: "none" },
-    ielts20:     { id: "ielts_20",    skill: "all",        label_ar: "صيانة IELTS ٢٠ دقيقة (جلسة قواعد)", min: 20, kind: "drill", action: "session" }
+    pron:        { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — جولة الصوت المقترح", min: 20, kind: "pron", action: "pron",
+                   target_ar: "جولة كاملة: ٨ تمارين — الهدف متوسط ٧٠/١٠٠ أو أعلى",
+                   how_ar: "سجّل كل جملة، اسمع النموذج 🔊، وكرّر أي كلمة ظهرت بالأحمر.",
+                   goal: { metric: "pron", n: 8 }, links: [L.underhill] },
+    pron10:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — جولة قصيرة", min: 10, kind: "pron", action: "pron",
+                   target_ar: "٨ تمارين — متوسط ٧٠ أو أعلى", goal: { metric: "pron", n: 8 } },
+    pron15:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — كلماتي للمراجعة", min: 15, kind: "pron", action: "pron:my_words",
+                   target_ar: "راجع كل كلماتك الحمراء — ٨ تمارين على الأقل", goal: { metric: "pron", n: 8 } },
+    vocab:       { id: "vocab",       skill: "vocabulary", label_ar: "مفردات أكاديمية — بطاقات AWL", min: 15, kind: "vocab",    action: "rule:vocab_awl",
+                   target_ar: "٢٠ بطاقة — الهدف دقة ٨٠٪ أو أعلى",
+                   how_ar: "اكتب سبب اختيارك قبل الكشف؛ الكلمات اللي تغلط فيها ترجع لك تلقائيًا.",
+                   goal: { metric: "vocab", n: 20 } },
+    grammar:     { id: "grammar",     skill: "writing",    label_ar: "جلسة القواعد ١٥ دقيقة (فكّر قبل الكشف)", min: 15, kind: "drill", action: "session", optional: true,
+                   target_ar: "جلسة كاملة (١٥ سؤال على الأقل) — الهدف دقة ٨٠٪",
+                   how_ar: "الجلسة تختار أضعف قواعدك تلقائيًا. عند أي غلطة: «ناقش خطأك».",
+                   goal: { metric: "drill", n: 15 } },
+    podcast:     { id: "podcast",     skill: "listening",  label_ar: "بودكاست إنجليزي في الطريق (لا يُحسب من الساعات)", min: 0, kind: "listen", action: "none", optional: true,
+                   target_ar: "حلقة واحدة (٦ دقائق) + ٣ تعبيرات جديدة",
+                   how_ar: "اسمعها مرة بدون نص، ومرة مع النص (Transcript) في نفس الصفحة.", links: [L.bbc6] },
+    listen2sec:  { id: "listen_2sec", skill: "listening",  label_ar: "Listening: قسمان + مراجعة الأخطاء", min: 40, kind: "practice", action: "log:exam", logs: "exam",
+                   target_ar: "قسمان (٢٠ سؤال) — الهدف ١٥/٢٠ أو أعلى",
+                   how_ar: "افتح اختبار Listening، اسمع القسمين بدون إيقاف، صحّح، اكتب سبب كل غلطة، ثم سجّل الدرجة هنا.",
+                   goal: { metric: "exam", skill: "listening", n: 1 }, links: [L.tests, L.lizL] },
+    listen20:    { id: "listen_20",   skill: "listening",  label_ar: "Listening ٢٠ دقيقة", min: 20, kind: "practice", action: "log:exam", logs: "exam",
+                   target_ar: "قسم واحد بالتوقيت — الهدف ٨/١٠ أو أعلى",
+                   goal: { metric: "exam", skill: "listening", n: 1 }, links: [L.tests] },
+    t1timed:     { id: "t1_timed",    skill: "writing",    label_ar: "Writing Task 1 بالتوقيت (٢٠ د) + تقييم", min: 30, kind: "writing", action: "writing:1", logs: "writing",
+                   target_ar: "١٥٠ كلمة أو أكثر في ٢٠ دقيقة — الهدف باند ٧",
+                   how_ar: "الموضوع من التطبيق ← شغّل المؤقّت ← اكتب ← أكمل قائمة المراجعة ← قيّم.",
+                   goal: { metric: "writing", task: 1, n: 1 }, links: [L.simon] },
+    readPassage: { id: "read_passage", skill: "reading",   label_ar: "Reading: passage واحدة + تحليل كل غلطة", min: 40, kind: "practice", action: "log:exam", logs: "exam",
+                   target_ar: "passage واحدة (١٣ سؤال) في ٢٠ دقيقة — الهدف ١٠/١٣ أو أعلى",
+                   how_ar: "حل بالتوقيت، ثم ارجع لكل غلطة: أين الدليل في النص؟ سجّل الدرجة وأنواع الأخطاء.",
+                   goal: { metric: "exam", skill: "reading", n: 1 }, links: [L.tests, L.lizR] },
+    t2write:     { id: "t2_write",    skill: "writing",    label_ar: "Writing Task 2: تخطيط + كتابة (٤٠ د)", min: 40, kind: "writing", action: "writing:2", logs: "writing",
+                   target_ar: "٢٥٠ كلمة أو أكثر في ٤٠ دقيقة — الهدف باند ٧",
+                   how_ar: "٥ دقائق تخطيط (رأيك + فكرتين + أمثلة) ← ٣٠ كتابة ← ٥ مراجعة بالقائمة ← قيّم.",
+                   goal: { metric: "writing", task: 2, n: 1 }, links: [L.simon] },
+    speakCards:  { id: "speak_cards", skill: "speaking",   label_ar: "Speaking Part 2 محاكى: بطاقة مسجّلة يقيّمها الممتحن (كرّرها حتى ٣ بطاقات)", min: 40, kind: "speaking", action: "mock:2",
+                   target_ar: "٣ بطاقات (دقيقة تحضير + دقيقتين كلام لكل بطاقة) — الهدف باند ٧",
+                   goal: { metric: "mock", n: 1 } },
+    lrTest:      { id: "lr_test",     skill: "listening",  label_ar: "امتحان Listening + Reading كامل بالتوقيت + سجل الأخطاء", min: 120, kind: "test", action: "log:exam", logs: "exam",
+                   target_ar: "Listening ٤٠ + Reading ٤٠ — الهدف ٣٠/٤٠ أو أعلى في كل منهما",
+                   how_ar: "جلسة واحدة بالتوقيت (٣٠ + ٦٠ دقيقة)، صحّح، وسجّل الدرجتين وأنواع الأخطاء.",
+                   goal: { metric: "exam_lr", n: 2 }, links: [L.tests, L.official] },
+    t2rewrite:   { id: "t2_timed_rewrite", skill: "writing", label_ar: "Task 2 بالتوقيت + إعادة كتابته بعد التقييم", min: 90, kind: "writing", action: "writing:2", logs: "writing",
+                   target_ar: "مقال جديد بالتوقيت + إعادة كتابته — الهدف +٠٫٥ في الإعادة",
+                   goal: { metric: "writing", task: 2, n: 2 }, links: [L.simon] },
+    italki:      { id: "italki",      skill: "speaking",   label_ar: "حصة italki (٣٠ د) — سجّل الباندات من المدرّس", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking",
+                   target_ar: "حصة ٣٠ دقيقة — سجّل الباندات الأربعة",
+                   goal: { metric: "tutor", n: 1 }, links: [L.italki] },
+    fullTest:    { id: "full_test",   skill: "all",        label_ar: "امتحان كامل على الكمبيوتر (L+R+W) بالتوقيت", min: 180, kind: "test", action: "log:exam", logs: "exam",
+                   target_ar: "L + R + W كامل بالتوقيت — الهدف ٧ أو أعلى لكل مهارة",
+                   goal: { metric: "exam_lr", n: 2 }, links: [L.tests, L.official] },
+    mockSpeak:   { id: "mock_speaking", skill: "speaking", label_ar: "Mock Speaking مع المدرّس", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking",
+                   target_ar: "Mock كامل (الأجزاء الثلاثة) — الهدف باند ٧", goal: { metric: "tutor", n: 1 }, links: [L.italki] },
+    cdFormat:    { id: "cd_format",   skill: "all",        label_ar: "تدريب على شكل الامتحان على الكمبيوتر (CD familiarisation)", min: 40, kind: "practice", action: "none",
+                   target_ar: "اختبار تجريبي واحد بشكل شاشة الامتحان", links: [L.official, L.idp, L.tests] },
+    errReview:   { id: "error_review", skill: "all",       label_ar: "مراجعة سجل الأخطاء الأسبوعي", min: 60, kind: "review", action: "none",
+                   target_ar: "حدّد ٣ أخطاء متكررة ← خطة الأسبوع القادم", links: [L.progress, L.history, L.coach] },
+    ielts20:     { id: "ielts_20",    skill: "all",        label_ar: "صيانة IELTS ٢٠ دقيقة (جلسة قواعد)", min: 20, kind: "drill", action: "session",
+                   target_ar: "جلسة كاملة — دقة ٨٠٪", goal: { metric: "drill", n: 15 } }
   };
 
   window.PLAN = {
-    start: "2026-11-01",
+    start: "2026-11-07",          // Ahmed: "ابدأ الخطة من اليوم" (2026-11-07) = day 1
     target: { primary: 7.0, stretch: 8.0 },
     skills: ["listening", "reading", "writing", "speaking"],
     exam: {
@@ -55,10 +122,10 @@
     },
 
     phases: [
-      { id: "rest", name_ar: "راحة", from: "2026-10-27", to: "2026-10-31", hours: 0,
-        focus_ar: "بودكاست إنجليزي لو حبيت — المذاكرة تبدأ ١ نوفمبر.", weekly_targets: {} },
-      { id: "warmup", name_ar: "تمهيد", from: "2026-11-01", to: "2026-11-07", hours: 5,
-        focus_ar: "عادة يومية: نطق ٢٠ + مفردات ١٥ + جلسة قواعد. بلا امتحانات بعد.",
+      { id: "rest", name_ar: "قبل البداية", from: "2026-10-27", to: "2026-11-06", hours: 0,
+        focus_ar: "الخطة تبدأ ٧ نوفمبر.", weekly_targets: {} },
+      { id: "warmup", name_ar: "يوم البداية", from: "2026-11-07", to: "2026-11-07", hours: 1,
+        focus_ar: "العادة اليومية من اليوم: نطق ٢٠ + مفردات ١٥ (+ جلسة قواعد). التشخيص يبدأ غدًا الأحد ٨ نوفمبر.",
         weekly_targets: {} },
       { id: "diagnostic", name_ar: "التشخيص", from: "2026-11-08", to: "2026-11-14", hours: 8,
         focus_ar: "امتحان كامل بالتوقيت + تقييم كتابة + حصة Speaking مع مدرّس → درجة لكل مهارة، وميعاد الامتحان يتحدد.",
@@ -117,11 +184,18 @@
 
     /* one-offs for the diagnostic week — any day; stay listed until done */
     diagnostic_tasks: [
-      { id: "diag_lr",        skill: "listening", label_ar: "امتحان Listening + Reading كامل (Cambridge، بالتوقيت، جلسة واحدة) — سجّل الدرجتين", min: 160, kind: "test", action: "log:exam", logs: "exam" },
-      { id: "diag_w1",        skill: "writing",   label_ar: "Writing Task 1 على الكمبيوتر (٢٠ د) + تقييم", min: 20, kind: "writing", action: "writing:1", logs: "writing" },
-      { id: "diag_w2",        skill: "writing",   label_ar: "Writing Task 2 على الكمبيوتر (٤٠ د) + تقييم", min: 40, kind: "writing", action: "writing:2", logs: "writing" },
-      { id: "diag_speak_rec", skill: "speaking",  label_ar: "امتحان Speaking محاكى كامل (Part 1-2-3) يسمعه ويقيّمه الممتحن الذكي", min: 15, kind: "speaking", action: "mock:full" },
-      { id: "diag_italki",    skill: "speaking",  label_ar: "حصة تقييم مع مدرّس italki — سجّل الباندات", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking" }
+      { id: "diag_lr",        skill: "listening", label_ar: "امتحان Listening + Reading كامل (Cambridge، بالتوقيت، جلسة واحدة) — سجّل الدرجتين", min: 160, kind: "test", action: "log:exam", logs: "exam",
+        target_ar: "Listening ٤٠ + Reading ٤٠ في جلسة واحدة — هذا خط الأساس، المهم الالتزام بالتوقيت",
+        how_ar: "من كتاب Cambridge لو معك، أو من الرابط: ٣٠ د Listening ثم ٦٠ د Reading بلا توقف، ثم سجّل الدرجتين.",
+        goal: { metric: "exam_lr", n: 2 }, links: [L.tests, L.official] },
+      { id: "diag_w1",        skill: "writing",   label_ar: "Writing Task 1 على الكمبيوتر (٢٠ د) + تقييم", min: 20, kind: "writing", action: "writing:1", logs: "writing",
+        target_ar: "١٥٠ كلمة أو أكثر في ٢٠ دقيقة بالكيبورد", goal: { metric: "writing", task: 1, n: 1 } },
+      { id: "diag_w2",        skill: "writing",   label_ar: "Writing Task 2 على الكمبيوتر (٤٠ د) + تقييم", min: 40, kind: "writing", action: "writing:2", logs: "writing",
+        target_ar: "٢٥٠ كلمة أو أكثر في ٤٠ دقيقة بالكيبورد", goal: { metric: "writing", task: 2, n: 1 } },
+      { id: "diag_speak_rec", skill: "speaking",  label_ar: "امتحان Speaking محاكى كامل (Part 1-2-3) يسمعه ويقيّمه الممتحن الذكي", min: 15, kind: "speaking", action: "mock:full",
+        target_ar: "الأجزاء الثلاثة (≈ ١٥ دقيقة) في مكان هادئ", goal: { metric: "mock", n: 1 } },
+      { id: "diag_italki",    skill: "speaking",  label_ar: "حصة تقييم مع مدرّس italki — سجّل الباندات", min: 30, kind: "speaking", action: "log:speaking", logs: "speaking",
+        target_ar: "احجز حصة تقييم (ممتحن سابق إن أمكن) وسجّل الباندات الأربعة", goal: { metric: "tutor", n: 1 }, links: [L.italki] }
     ],
 
     /* after the diagnostic: lowest skill band → booking window (first match wins) */
@@ -177,12 +251,13 @@
       { name: "Computer-delivered familiarisation test", skill_ar: "الكل", use_ar: "تتعوّد على شكل الشاشة قبل الامتحان", cost_ar: "مجاني", url: "https://ielts.org/take-a-test/preparation-resources" },
       { name: "IELTS Simon", skill_ar: "Writing · Speaking", use_ar: "نماذج مقالات بـ band عالٍ وطريقة بسيطة لبناء المقال", cost_ar: "مجاني", url: "https://ielts-simon.com" },
       { name: "IELTS Liz", skill_ar: "الكل", use_ar: "شرح أنواع الأسئلة ونصائح الـ Reading والـ Listening", cost_ar: "مجاني", url: "https://ieltsliz.com" },
-      { name: "Gemini داخل التطبيق + band descriptors", skill_ar: "Writing", use_ar: "تقييم كل مقال بالمعايير الأربعة ومتابعة أخطائك المتكررة", cost_ar: "مجاني (طبقة مجانية)" },
+      { name: "Claude / Gemini داخل التطبيق + band descriptors", skill_ar: "Writing", use_ar: "تقييم كل مقال بالمعايير الأربعة ومتابعة أخطائك المتكررة", cost_ar: "Claude برصيدك · Gemini مجاني" },
       { name: "italki — مدرّس IELTS (يفضّل ممتحن سابق)", skill_ar: "Speaking · Writing", use_ar: "التقييم البشري الذي لا يستطيعه الذكاء الاصطناعي — مرة أسبوعيًا", cost_ar: "مدفوع بالحصة", url: "https://www.italki.com" },
-      { name: "Adrian Underhill — Sound Foundations", skill_ar: "Speaking", use_ar: "أساس الأصوات ومخارجها (p/b، v/f، النبر)", cost_ar: "فيديوهات مجانية" },
+      { name: "Adrian Underhill — Sound Foundations", skill_ar: "Speaking", use_ar: "أساس الأصوات ومخارجها (p/b، v/f، النبر)", cost_ar: "فيديوهات مجانية", url: L.underhill.url },
+      { name: "IELTS Online Tests", skill_ar: "Listening · Reading", use_ar: "اختبارات مجانية بشكل شاشة الكمبيوتر للتدريب الأسبوعي", cost_ar: "مجاني (بتسجيل)", url: L.tests.url },
       { name: "مختبر النطق + امتحان Speaking داخل التطبيق", skill_ar: "Speaking", use_ar: "تمرين نطق يومي يسمعه Gemini ويقيّمه لكل صوت وكلمة، وامتحان محاكى بالمعايير الأربعة — بديل ELSA", cost_ar: "مجاني (طبقة Gemini المجانية)" },
       { name: "ELSA Speak", skill_ar: "Speaking", use_ar: "اختياري الآن — مقيّم نطق متخصص أدقّ في الأصوات المفردة إن أردت رأيًا ثانيًا", cost_ar: "مجاني مع نسخة مدفوعة" },
-      { name: "BBC 6 Minute English + بودكاست اقتصادي", skill_ar: "Listening", use_ar: "في الطريق — مواضيع تهمك لتستمر", cost_ar: "مجاني" },
+      { name: "BBC 6 Minute English + بودكاست اقتصادي", skill_ar: "Listening", use_ar: "في الطريق — مواضيع تهمك لتستمر", cost_ar: "مجاني", url: L.bbc6.url },
       { name: "IDP Salmiya (Dalal Complex)", skill_ar: "الامتحان", use_ar: "يقدّم IELTS Academic على الكمبيوتر", cost_ar: "رسوم الامتحان" }
     ]
   };

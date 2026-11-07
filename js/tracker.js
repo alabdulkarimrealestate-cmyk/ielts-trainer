@@ -290,11 +290,54 @@
     };
   }
 
+  /* Live progress toward one task's daily target (data/plan.js `goal`), read
+     from the records themselves — the same data the weekly stats use. */
+  function taskProgress(t, date) {
+    var g = t && t.goal;
+    if (!g) return null;
+    date = date || Plan.today();
+    function onDay(list) { return (list || []).filter(function (x) { return x && x.date === date; }); }
+    var have = 0, text = "", need = g.n || 1;
+    if (g.metric === "pron") {
+      var ps = onDay(Store.pron());
+      have = ps.length;
+      var sc = ps.map(function (p) { return Number(p.overall); }).filter(function (v) { return isFinite(v); });
+      var avg = sc.length ? Math.round(sc.reduce(function (a, b) { return a + b; }, 0) / sc.length) : null;
+      text = "اليوم: " + have + "/" + need + " تمارين" + (avg != null ? " · متوسط " + avg + "/100" : "");
+    } else if (g.metric === "vocab" || g.metric === "drill") {
+      var ls = onDay(Store.get().log).filter(function (e) { return g.metric === "vocab" ? e.rule === "vocab_awl" : e.rule !== "vocab_awl"; });
+      have = ls.length;
+      var ok = ls.filter(function (e) { return e.correct; }).length;
+      text = "اليوم: " + have + "/" + need + " سؤال" + (have ? " · دقة " + Math.round(ok / have * 100) + "٪" : "");
+    } else if (g.metric === "exam") {
+      var ex = onDay(Store.exams()).filter(function (e) { return !g.skill || e.skill === g.skill; });
+      have = ex.length;
+      var last = ex[ex.length - 1];
+      text = have ? "سُجّل اليوم: " + (last.raw != null ? last.raw + "/" + (last.total || 40) : "") + (last.band != null ? " ≈ باند " + last.band : "") : "لم تُسجَّل درجة اليوم بعد";
+    } else if (g.metric === "exam_lr") {
+      var exs = onDay(Store.exams());
+      var hasL = exs.some(function (e) { return e.skill === "listening"; }), hasR = exs.some(function (e) { return e.skill === "reading"; });
+      have = (hasL ? 1 : 0) + (hasR ? 1 : 0); need = 2;
+      text = "Listening " + (hasL ? "✓" : "—") + " · Reading " + (hasR ? "✓" : "—");
+    } else if (g.metric === "writing") {
+      var ws = onDay(Store.writings()).filter(function (w) { return !g.task || Number(w.task) === Number(g.task); });
+      have = ws.length;
+      var lw = ws[ws.length - 1], b = lw ? evalOverall(lw) : null;
+      text = "اليوم: " + have + "/" + need + " مقال" + (b != null ? " · آخر تقييم " + b : "");
+    } else if (g.metric === "mock" || g.metric === "tutor") {
+      var sp = onDay(Store.speaking()).filter(function (s) { return g.metric === "mock" ? s.kind === "ai-audio" : (s.kind === "tutor" || s.kind === "mock"); });
+      have = sp.length;
+      var lb = sp.length && sp[sp.length - 1].bands ? sp[sp.length - 1].bands.overall : null;
+      text = have ? "سُجّل اليوم" + (lb != null ? " · باند " + lb : "") : "لم يُسجَّل اليوم بعد";
+    } else return null;
+    return { have: have, need: need, met: have >= need, text: text };
+  }
+
   window.Tracker = {
     SKILLS: SKILLS,
     rawToBand: rawToBand, overallBand: overallBand, writingCombined: writingCombined, round05: round05,
     series: series, skillSummary: skillSummary, allSummaries: allSummaries, projection: projection,
     weekStats: weekStats, errorTagFrequency: errorTagFrequency, ruleBoost: ruleBoost,
-    diagnosticBands: diagnosticBands, dataPack: dataPack
+    diagnosticBands: diagnosticBands, dataPack: dataPack, taskProgress: taskProgress
   };
 })();
