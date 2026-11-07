@@ -47,24 +47,54 @@
   function cleanForSpeech(text) {
     return String(text || "").replace(/[*_#`>|]/g, " ").replace(/\s+/g, " ").trim();
   }
+  // Sentence-sized pieces: Chrome silently stops long utterances (~15 s with
+  // online voices) and drops queued ones it has no reference to, so a long
+  // bilingual reply used to end after a sentence or two.
+  function splitSentences(text) {
+    var out = [];
+    String(text).split(/\n+/).forEach(function (para) {
+      (para.match(/[^.!?؟…]+[.!?؟…]*/g) || []).forEach(function (s) { s = s.trim(); if (s) out.push(s); });   // no lookbehind: older Safari
+    });
+    return out;
+  }
+  var run = 0, live = [], keepAlive = null;   // live: utterances kept referenced (Chrome GC bug)
+  var DESKTOP_CHROME = /Chrome\//.test(navigator.userAgent) && !/Mobile|Android/.test(navigator.userAgent);
   // opts.rate: speaking rate (pronunciation models use a slower one)
   function speak(text, onDone, opts) {
     opts = opts || {};
     if (!TTS) { if (onDone) onDone(); return; }
-    TTS.cancel();
-    var chunks = splitByScript(cleanForSpeech(text));
+    stopSpeaking();
+    var chunks = [];
+    splitSentences(cleanForSpeech(text)).forEach(function (s) {
+      splitByScript(s).forEach(function (c) {
+        var last = chunks[chunks.length - 1];
+        // a lone English word inside an Arabic sentence (a, the, of) sounds choppy as its own utterance:
+        // the Arabic voice reads it acceptably, so glue it on. Arabic never goes to the English voice.
+        var glue = last && (last.text + " " + c.text).length <= 180 && (last.kind === c.kind || (c.kind === "en" && c.text.length <= 12 && last.kind === "ar"));
+        if (glue) last.text += " " + c.text;
+        else chunks.push({ kind: c.kind, text: c.text });
+      });
+    });
     if (!chunks.length) { if (onDone) onDone(); return; }
-    var done = false;
-    function finish() { if (!done) { done = true; if (onDone) onDone(); } }
-    chunks.forEach(function (c, i) {
+    var id = ++run, i = 0, done = false;
+    function finish() { if (done) return; done = true; live = []; stopKeepAlive(); if (onDone) onDone(); }
+    function next() {
+      if (id !== run) return;                       // superseded by a newer speak()/stop
+      if (i >= chunks.length) { finish(); return; }
+      var c = chunks[i++];
       var u = new SpeechSynthesisUtterance(c.text);
       u.lang = c.kind === "ar" ? "ar-EG" : "en-GB"; u.rate = opts.rate || 0.95;
       var v = pickVoice(c.kind); if (v) u.voice = v;
-      if (i === chunks.length - 1) { u.onend = finish; u.onerror = finish; }
+      u.onend = function () { setTimeout(next, 60); };
+      u.onerror = function (e) { if (e && e.error === "interrupted" || e && e.error === "canceled") return; setTimeout(next, 60); };  // skip a bad chunk, keep going
+      live.push(u);
       TTS.speak(u);
-    });
+    }
+    if (DESKTOP_CHROME) keepAlive = setInterval(function () { if (TTS.speaking && !TTS.paused) { TTS.pause(); TTS.resume(); } }, 10000);
+    next();
   }
-  function stopSpeaking() { if (TTS) { try { TTS.cancel(); } catch (e) {} } }
+  function stopKeepAlive() { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } }
+  function stopSpeaking() { run++; live = []; stopKeepAlive(); if (TTS) { try { TTS.cancel(); } catch (e) {} } }
 
   /* ---------------- widget ----------------
      opts: { title, system (string | function), opening (hidden first turn),
@@ -220,7 +250,7 @@
   function openForError(host, item, answer, reasoning, onClose) {
     var P = window.Prompts;
     return open(host, {
-      title: "💬 " + (window.ruleLabel ? window.ruleLabel(item.rule) : item.rule) + " — ناقش خطأك",
+      title: "💬 " + (window.ruleLabel ? window.ruleLabel(item.rule) : item.rule) + " — اشرح لي خطأي",
       system: P.errorChatSystem(),
       opening: P.errorChatOpening(item, answer, reasoning),
       fallbackPrompt: P.errorChat(item, answer, reasoning),
