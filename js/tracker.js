@@ -305,7 +305,8 @@
       var avg = sc.length ? Math.round(sc.reduce(function (a, b) { return a + b; }, 0) / sc.length) : null;
       text = "اليوم: " + have + "/" + need + " تمارين" + (avg != null ? " · متوسط " + avg + "/100" : "");
     } else if (g.metric === "vocab" || g.metric === "drill") {
-      var ls = onDay(Store.get().log).filter(function (e) { return g.metric === "vocab" ? e.rule === "vocab_awl" : e.rule !== "vocab_awl"; });
+      var inVocab = function (e) { var r = (window.RULE_MAP || {})[e.rule]; return !!r && r.group === "المفردات"; };
+      var ls = onDay(Store.get().log).filter(function (e) { return g.metric === "vocab" ? inVocab(e) : !inVocab(e); });
       have = ls.length;
       var ok = ls.filter(function (e) { return e.correct; }).length;
       text = "اليوم: " + have + "/" + need + " سؤال" + (have ? " · دقة " + Math.round(ok / have * 100) + "٪" : "");

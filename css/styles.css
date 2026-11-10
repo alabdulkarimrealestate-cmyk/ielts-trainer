@@ -121,6 +121,8 @@ h1,h2,h3{margin:0 0 .4em}
 .opt.sel,.tok.sel{border-color:var(--accent); background:var(--accent); color:#fff}
 .opt.correct,.tok.correct{border-color:var(--good); background:var(--good); color:#fff}
 .opt:disabled,.tok:disabled{cursor:default}
+.fe-box{direction:ltr; justify-content:flex-start; gap:6px; line-height:1.4}
+.fe-box .tok{font-size:16px; padding:9px 12px}
 
 .reason-label{display:block; margin:14px 0 6px; font-size:14px; font-weight:600}
 .reason{width:100%; border:1.5px solid var(--line); border-radius:12px; padding:10px;

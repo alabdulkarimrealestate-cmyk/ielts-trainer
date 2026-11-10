@@ -39,6 +39,8 @@
         item.rule === "word_stress" ? "اختر المقطع الذي يحمل النبر الأساسي:"
                                     : "اختر المقطع/المقاطع الذي يحمل صوت الشوا /ə/:");
       wrap.appendChild(hint);
+    } else if (item.rule === "find_error") {
+      wrap.appendChild(el("div", "q-hint", "فيها خطأ واحد فقط — اضغط على الكلمة الخاطئة:"));
     } else if (item.rule === "sentence_stress") {
       var hint2 = el("div", "q-hint", "اختر الكلمات التي تُنبَر (كلمات المحتوى):");
       wrap.appendChild(hint2);
@@ -87,6 +89,30 @@
         answerText: function () { return item.syllables[selected]; },
         lock: function () { chips.forEach(function (c) { c.disabled = true; }); },
         revealCorrect: function () { mark(chips[item.correct_index], true); chips[item.correct_index].classList.add("correct"); }
+      };
+    }
+
+    if (item.rule === "find_error") {
+      // proofreading: the sentence is the answer area — tap the one wrong word
+      box.className = "ans-box fe-box";
+      var ftoks = [];
+      item.words.forEach(function (w, idx) {
+        var c = el("button", "tok ltr", w);
+        c.type = "button";
+        c.onclick = function () {
+          selected = idx;
+          ftoks.forEach(function (x, i) { mark(x, i === idx); });
+          onChange();
+        };
+        ftoks.push(c); box.appendChild(c);
+      });
+      return {
+        node: box,
+        answered: function () { return selected !== null; },
+        grade: function () { return selected === item.error_index; },
+        answerText: function () { return item.words[selected]; },
+        lock: function () { ftoks.forEach(function (c) { c.disabled = true; }); },
+        revealCorrect: function () { ftoks[item.error_index].classList.add("correct"); }
       };
     }
 
@@ -287,6 +313,7 @@
   }
 
   function correctText(item) {
+    if (item.rule === "find_error") return item.words[item.error_index] + "  →  " + item.correction;
     if (item.rule === "word_stress") return item.syllables[item.correct_index].toUpperCase();
     if (item.rule === "sentence_stress") return item.stressed.map(function (i) { return item.words[i]; }).join(" · ");
     if (item.rule === "schwa") return item.schwa.map(function (i) { return item.syllables[i]; }).join(" · ");

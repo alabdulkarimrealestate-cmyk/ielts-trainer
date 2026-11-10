@@ -9,5 +9,5 @@ window.registerModule({
   rules: [
     { id: "vocab_awl", label: "مفردات أكاديمية (AWL)", group: "المفردات", short: "AWL" }
   ],
-  items: window.BANK_VOCAB_AWL || []
+  items: (window.BANK_VOCAB_AWL || []).concat((window.BANK_VOCAB_MORE || {}).awl3 || [])
 });

@@ -40,30 +40,68 @@
     return base * Math.min(2, Math.max(0.5, boost));
   }
 
+  /* ---------------- group mix (the daily vocabulary task) ----------------
+     Cards from EVERY rule in a group (e.g. "المفردات": AWL, topics, phrasal
+     verbs, collocations, data language), shared by weakness (never-seen and
+     low-accuracy rules get more), at least one card per rule, Leitner order
+     inside each rule (pickForRule). meaning_reversal stays in grammar.   */
+  function buildGroupMix(group, total) {
+    var rules = (window.RULES || []).filter(function (r) { return r.group === group && window.itemsForRule(r.id).length; });
+    if (!rules.length) return [];
+    var w = rules.map(function (r) { return weakness(r.id) * (window.ruleMode(r.id) === "active" ? 1.5 : 1); });
+    var wsum = w.reduce(function (a, b) { return a + b; }, 0), out = [];
+    rules.forEach(function (r, i) { out = out.concat(pickForRule(r.id, Math.max(1, Math.round(total * w[i] / wsum)))); });
+    // top up from the biggest banks if rounding left us short
+    var guard = 0;
+    while (out.length < total && guard++ < 5) {
+      var have = {}; out.forEach(function (x) { have[x.id] = true; });
+      var more = [];
+      rules.forEach(function (r) { pickForRule(r.id, 4).forEach(function (x) { if (!have[x.id]) more.push(x); }); });
+      if (!more.length) break;
+      out = out.concat(shuffle(more).slice(0, total - out.length));
+    }
+    return shuffle(out).slice(0, total);
+  }
+
   /* ---------------- calm session (daily default) ----------------
-     mode weights: active 70% / maintenance 20% / background 10%,
+     mode weights: active 60% / maintenance 33% / background 7%,
      scaled inside each bucket by per-rule weakness. */
+  // Spread `quota` picks over `rules`: every rule in `must` gets one first, then
+  // the rest by weakness-weighted random draws (diminishing, so a bucket with
+  // more rules than picks still rotates through all of them over the days).
+  function allocate(rules, weights, quota, core, forceAll) {
+    var counts = {}, left = quota;
+    rules.forEach(function (r) { counts[r] = 0; });
+    // core patterns are always present; every rule is too when the bucket has room for all
+    var mustHere = forceAll && rules.length <= quota ? rules.slice() : rules.filter(function (r) { return core[r]; });
+    if (mustHere.length <= left) mustHere.forEach(function (r) { counts[r] = 1; left--; });
+    var w = weights.slice();
+    while (left > 0 && rules.length) {
+      var total = w.reduce(function (a, b) { return a + b; }, 0), x = Math.random() * total, i = 0;
+      for (; i < w.length - 1; i++) { x -= w[i]; if (x <= 0) break; }
+      counts[rules[i]] += 1; left--; w[i] *= 0.5;
+    }
+    return counts;
+  }
+
   function buildCalmSession(totalItems) {
     var buckets = { active: [], maintenance: [], background: [] };
+    var core = {};   // Ahmed's four essay-error patterns: never absent from a daily session
     (window.RULES || []).forEach(function (r) {
-      var m = window.ruleMode(r.id);
+      var m = window.ruleMode(r.id), mod = window.RULE_MODULE[r.id] || {};
       (buckets[m] || buckets.active).push(r.id);
+      if (mod.core_pattern) core[r.id] = true;
     });
-    var quota = {
-      active: Math.max(1, Math.round(totalItems * 0.7)),
-      maintenance: Math.max(1, Math.round(totalItems * 0.2)),
-      background: Math.max(1, totalItems - Math.round(totalItems * 0.7) - Math.round(totalItems * 0.2))
-    };
+    // 22 rules now share one session: active 60% / maintenance 33% / background 7%
+    // (maintenance gained many rules — it needs room so each one rotates in every few days)
+    var nAct = Math.round(totalItems * 0.6), nMain = Math.round(totalItems * 0.33);
+    var quota = { active: Math.max(1, nAct), maintenance: Math.max(1, nMain), background: Math.max(1, totalItems - nAct - nMain) };
     var out = [];
     Object.keys(buckets).forEach(function (mode) {
-      var rules = buckets[mode];
+      var rules = buckets[mode].filter(function (rid) { return window.itemsForRule(rid).length; });   // empty banks take no slots
       if (!rules.length) return;
-      var weights = rules.map(weakness);
-      var wsum = weights.reduce(function (a, b) { return a + b; }, 0);
-      rules.forEach(function (rid, i) {
-        var n = Math.max(mode === "active" ? 1 : 0, Math.round(quota[mode] * weights[i] / wsum));
-        out = out.concat(pickForRule(rid, n));
-      });
+      var counts = allocate(rules, rules.map(weakness), quota[mode], core, mode === "active");
+      rules.forEach(function (rid) { if (counts[rid]) out = out.concat(pickForRule(rid, counts[rid])); });
     });
     return shuffle(out).slice(0, totalItems);
   }
@@ -142,6 +180,7 @@
   window.Engine = {
     buildCalmSession: buildCalmSession,
     buildLoadSession: buildLoadSession,
+    buildGroupMix: buildGroupMix,
     pickForRule: pickForRule,
     gateProgress: gateProgress,
     fragileRules: fragileRules,

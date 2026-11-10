@@ -7,6 +7,7 @@ window.registerModule({
   name_en: "Verb forms",
   stage_id: 1,
   mode: "maintenance",
+  core_pattern: true,
   rules: [
     { id: "verbform", label: "صيغة الفعل", group: "القواعد", short: "الفعل" }
   ],

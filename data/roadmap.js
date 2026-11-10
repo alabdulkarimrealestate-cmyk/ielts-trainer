@@ -27,7 +27,7 @@ window.ROADMAP = {
       name_en: "Core grammar foundations",
       desc_ar: "الأدوات، صيغ الأفعال، الرابط والتطابق — أُغلقت لكنها تنهار تحت الضغط",
       status: "closed_fragile",
-      modules: ["articles", "verb_forms", "copula_agreement", "reversal_pairs", "phonetics"]
+      modules: ["articles", "verb_forms", "copula_agreement", "reversal_pairs", "phonetics", "countability", "find_error"]
     },
     {
       id: 2,
@@ -35,7 +35,7 @@ window.ROADMAP = {
       name_en: "Complex sentences with connectors",
       desc_ar: "because / although / if / when — موضع الفاصلة واكتمال العبارات",
       status: "active",
-      modules: ["connectors"],
+      modules: ["connectors", "tenses", "conditionals", "passive_voice", "relative_clauses", "word_forms"],
       note_ar: "المحتوى يُضاف تدريجيًا مع جلسات التدريس — أسقط ملف connectors.js في data/modules/ وأضف اسمه في _index.js"
     },
     {
@@ -44,7 +44,7 @@ window.ROADMAP = {
       name_en: "Collocations & vocabulary",
       desc_ar: "make/do/take/have + أزواج حروف الجر (contribution to, attention to…)",
       status: "active",
-      modules: ["collocations", "preposition_pairs"]
+      modules: ["collocations", "preposition_pairs", "vocab_awl", "vocab_topics", "phrasal_verbs", "trend_language"]
     },
     {
       id: 4,

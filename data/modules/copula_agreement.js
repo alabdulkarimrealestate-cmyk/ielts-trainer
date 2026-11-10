@@ -8,6 +8,7 @@ window.registerModule({
   stage_id: 1,
   mode: "maintenance",
   load_priority: true,
+  core_pattern: true,
   rules: [
     { id: "copula", label: "الرابط والتطابق", group: "القواعد", short: "الرابط" }
   ],

@@ -53,9 +53,9 @@
                    target_ar: "٨ تمارين — متوسط ٧٠ أو أعلى", goal: { metric: "pron", n: 8 } },
     pron15:      { id: "pron",        skill: "speaking",   label_ar: "مختبر النطق — كلماتي للمراجعة", min: 15, kind: "pron", action: "pron:my_words",
                    target_ar: "راجع كل كلماتك الحمراء — ٨ تمارين على الأقل", goal: { metric: "pron", n: 8 } },
-    vocab:       { id: "vocab",       skill: "vocabulary", label_ar: "مفردات أكاديمية — بطاقات AWL", min: 15, kind: "vocab",    action: "rule:vocab_awl",
-                   target_ar: "٢٠ بطاقة — الهدف دقة ٨٠٪ أو أعلى",
-                   how_ar: "اكتب سبب اختيارك قبل الكشف؛ الكلمات اللي تغلط فيها ترجع لك تلقائيًا.",
+    vocab:       { id: "vocab",       skill: "vocabulary", label_ar: "مفردات اليوم — AWL + مواضيع + أفعال مركّبة + متلازمات + وصف الرسوم", min: 15, kind: "vocab", action: "vocab_mix",
+                   target_ar: "٢٠ بطاقة مختلطة من كل بنوك المفردات — الهدف دقة ٨٠٪ أو أعلى",
+                   how_ar: "اكتب سبب اختيارك قبل الكشف؛ الكلمات اللي تغلط فيها ترجع لك تلقائيًا، والأضعف عندك يظهر أكثر.",
                    goal: { metric: "vocab", n: 20 } },
     grammar:     { id: "grammar",     skill: "writing",    label_ar: "جلسة القواعد ١٥ دقيقة (فكّر قبل الكشف)", min: 15, kind: "drill", action: "session", optional: true,
                    target_ar: "جلسة كاملة (١٥ سؤال على الأقل) — الهدف دقة ٨٠٪",
@@ -235,13 +235,20 @@
       "MEANING-REVERSAL": "meaning_reversal",
       "CONNECTORS": "connectors",
       "COLLOCATION": "collocations",
-      "PREPOSITION": null,
+      "PREPOSITION": "dependent_prepositions",
+      "TENSE": "tenses",
+      "PASSIVE": "passive_voice",
+      "WORD-FORM": "word_forms",
+      "COUNTABILITY": "countability",
+      "RELATIVE": "relative_clauses",
+      "CONDITIONAL": "conditionals",
       "OTHER": null
     },
     error_tag_labels_ar: {
       "ARTICLES": "الأدوات", "VERB-FORM": "صيغة الفعل", "COPULA-AGREEMENT": "الرابط والتطابق",
       "MEANING-REVERSAL": "معكوسة المعنى", "CONNECTORS": "الروابط", "COLLOCATION": "المتلازمات",
-      "PREPOSITION": "حروف الجر", "OTHER": "أخرى"
+      "PREPOSITION": "حروف الجر", "TENSE": "الأزمنة", "PASSIVE": "المجهول", "WORD-FORM": "اشتقاق الكلمة",
+      "COUNTABILITY": "المعدود", "RELATIVE": "جمل الصلة", "CONDITIONAL": "الشرط", "OTHER": "أخرى"
     },
 
     error_types_lr: ["إملاء", "True/False/Not Given", "Matching headings", "اختيار من متعدد", "خريطة/رسم", "إكمال جمل/ملخّص", "ضاع الوقت", "لم أفهم المتحدث (القسم 3/4)"],

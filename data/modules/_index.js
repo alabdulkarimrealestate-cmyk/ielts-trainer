@@ -17,7 +17,19 @@ window.MODULE_FILES = [
   "reversal_pairs.js",
   "phonetics.js",
   "collocations.js",
-  "vocab_awl.js"
+  "vocab_awl.js",
+  "tenses.js",
+  "conditionals.js",
+  "passive_voice.js",
+  "relative_clauses.js",
+  "countability.js",
+  "word_forms.js",
+  "connectors.js",
+  "preposition_pairs.js",
+  "find_error.js",
+  "trend_language.js",
+  "vocab_topics.js",
+  "phrasal_verbs.js"
 ];
 
 window.MODULES = [];

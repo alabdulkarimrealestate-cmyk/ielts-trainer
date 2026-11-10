@@ -6,7 +6,8 @@
 (function () {
   "use strict";
 
-  var TAGS = ["ARTICLES", "VERB-FORM", "COPULA-AGREEMENT", "MEANING-REVERSAL", "CONNECTORS", "COLLOCATION", "PREPOSITION", "OTHER"];
+  var TAGS = ["ARTICLES", "VERB-FORM", "COPULA-AGREEMENT", "MEANING-REVERSAL", "CONNECTORS", "COLLOCATION", "PREPOSITION",
+              "TENSE", "PASSIVE", "WORD-FORM", "COUNTABILITY", "RELATIVE", "CONDITIONAL", "OTHER"];
   var MARK_OPEN = "<<<IELTS_JSON", MARK_CLOSE = "IELTS_JSON>>>";
 
   // Current meaning-reversal watchlist, auto-pulled from module data + user additions.
@@ -361,6 +362,9 @@ topic
 
   // Human-readable description of any drill item type (for the error chat).
   function describeItem(item) {
+    if (item.rule === "find_error")
+      return 'Proofreading item — the learner had to tap the one wrong word in: "' + item.sentence + '". The wrong word is "' +
+             item.words[item.error_index] + '"; the correction is "' + item.correction + '".';
     if (item.rule === "word_stress")
       return 'Word: "' + item.word + '" — mark the syllable with PRIMARY stress. Syllables: ' +
              item.syllables.join(" · ") + '. Correct: "' + item.syllables[item.correct_index].toUpperCase() +

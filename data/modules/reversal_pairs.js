@@ -8,8 +8,9 @@ window.registerModule({
   stage_id: 1,
   mode: "active",
   permanent_watchlist: true,
+  core_pattern: true,
   rules: [
     { id: "meaning_reversal", label: "مفردات معكوسة المعنى", group: "القواعد", short: "مفردات" }
   ],
-  items: window.BANK_VOCAB || []
+  items: (window.BANK_VOCAB || []).concat((window.BANK_VOCAB_MORE || {}).reversal_x || [])
 });

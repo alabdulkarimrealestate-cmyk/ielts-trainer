@@ -11,5 +11,5 @@ window.registerModule({
   rules: [
     { id: "collocations", label: "المتلازمات اللفظية", group: "المفردات", short: "متلازمات" }
   ],
-  items: window.BANK_COLLOCATIONS || []
+  items: (window.BANK_COLLOCATIONS || []).concat((window.BANK_VOCAB_MORE || {}).collocations_x || [])
 });

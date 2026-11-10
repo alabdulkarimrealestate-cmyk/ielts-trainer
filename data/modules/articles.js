@@ -7,6 +7,7 @@ window.registerModule({
   stage_id: 1,
   mode: "background",
   never_gate: true,
+  core_pattern: true,
   rules: [
     { id: "articles", label: "الأدوات (a/an/the)", group: "القواعد", short: "الأدوات" }
   ],

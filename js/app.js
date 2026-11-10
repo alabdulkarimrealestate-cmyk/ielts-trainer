@@ -237,6 +237,26 @@
     view.appendChild(wrap);
   }
 
+  // Run any prepared queue as a one-off practice page (used by the daily vocabulary mix).
+  function startQueue(title, queue, again) {
+    clear(view);
+    var wrap = el("div", "page");
+    wrap.appendChild(el("h2", "page-title", title));
+    var prog = el("div", "progress"), host = el("div", "runner-host");
+    wrap.appendChild(prog); wrap.appendChild(host);
+    view.appendChild(wrap);
+    Session.run(queue, host, {
+      kind: "rule", progressEl: prog,
+      onFinish: function (sum) { summaryView(sum, wrap, again); }
+    });
+    Array.prototype.forEach.call(nav.children, function (b) { b.classList.toggle("active", b.dataset.route === "practice"); });
+  }
+  function startVocabMix() {
+    var q = window.Engine.buildGroupMix("المفردات", 20);
+    if (!q.length) { go("practice"); return; }
+    startQueue("مفردات اليوم — ٢٠ بطاقة مختلطة", q, startVocabMix);
+  }
+
   function startRule(ruleId) {
     clear(view);
     var wrap = el("div", "page");
@@ -812,7 +832,7 @@
   }
 
   window.App = {
-    go: go, startRule: startRule, current: function () { return currentRoute; },
+    go: go, startRule: startRule, startVocabMix: startVocabMix, current: function () { return currentRoute; },
     view: function () { return view; }, homeWidgets: homeWidgets, escapeHtml: escapeHtml
   };
   if (document.readyState === "loading") {

@@ -118,6 +118,7 @@
     if (a.indexOf("mock:") === 0) return go("speak", { tab: "mock", mode: a.slice(5), taskKey: t.key, minutes: t.min });
     if (a === "session") return go("session");
     if (a === "load") return go("load");
+    if (a === "vocab_mix") return window.App.startVocabMix();
     if (a.indexOf("rule:") === 0) {
       var rid = a.slice(5);
       if (window.RULE_MAP && window.RULE_MAP[rid] && window.itemsForRule(rid).length) return window.App.startRule(rid);
@@ -131,6 +132,7 @@
   function actionLabel(a) {
     a = a || "none";
     if (a === "session") return "ابدأ الجلسة";
+    if (a === "vocab_mix") return "تدرّب";
     if (a === "load") return "جلسة ضغط";
     if (a.indexOf("rule:") === 0) return "تدرّب";
     if (a.indexOf("writing:") === 0) return "اكتب";
