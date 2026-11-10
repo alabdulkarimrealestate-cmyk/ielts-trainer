@@ -271,7 +271,7 @@
         var answerTxt = ctrl.answerText(), reasonTxt = reason.value.trim();
         var chatHost = el("div", "chat-host");
         var hasAI = function () { return !!(window.AI && window.AI.enabled()); };
-        var chatLbl = function () { return hasAI() ? "💬 ناقش خطأك مع " + window.AI.providerLabel() + " الآن — كتابة أو صوت" : "💬 ناقش خطأك هنا — كتابة أو صوت"; };
+        var chatLbl = function () { return hasAI() ? "💬 اشرح لي خطأي مع " + window.AI.providerLabel() + " الآن — كتابة أو صوت" : "💬 اشرح لي خطأي هنا — كتابة أو صوت"; };
         var openBtn = el("button", "btn wide chat-btn", chatLbl());
         openBtn.type = "button";
         var openChat = function () {
