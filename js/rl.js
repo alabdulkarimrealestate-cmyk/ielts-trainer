@@ -543,7 +543,7 @@
     var by = { A: [], B: [], C: [] };
     all.forEach(function (p) { (by[p.pattern] || by.A).push(p); });
     var out = [];
-    ["A", "B", "C"].forEach(function (k) { var l = by[k].slice().sort(function (a, b) { return seen(a) - seen(b) || Math.random() - 0.5; }); if (l[0]) out.push(l[0]); });
+    ["A", "B", "C"].forEach(function (k) { var l = by[k].slice().sort(function (a, b) { return seen(a) - seen(b) || (a.unreviewed ? 1 : 0) - (b.unreviewed ? 1 : 0) || Math.random() - 0.5; }); if (l[0]) out.push(l[0]); });
     if (out.length < 3) all.slice().sort(function (a, b) { return seen(a) - seen(b); }).forEach(function (p) { if (out.length < 3 && out.indexOf(p) === -1) out.push(p); });
     return out;
   }
@@ -603,6 +603,7 @@
     left.appendChild(el("div", "rl-item-title ltr", x.title));
     var meta = kind === "reading" ? (x.topic || "") + " · " + ({ A: "T/F/NG + MCQ", B: "Headings + T/F/NG", C: "Paragraphs + MCQ" }[x.pattern] || "") : "Section " + x.section;
     left.appendChild(el("div", "rl-item-meta ltr", meta));
+    if (x.unreviewed) left.appendChild(el("div", "rl-item-new", "جديد — لم يراجعه قارئ ثانٍ بعد؛ لو شككت في سؤال ابعته"));
     if (info.best) left.appendChild(el("div", "rl-item-best", "أفضل نتيجة: " + info.best.score + "/" + info.best.of + " · ≈ Band " + fmtBand(info.best.band) + " · " + info.n + " محاولة"));
     row.appendChild(left);
     row.appendChild(btn(info.n ? "↻ أعد" : "▶ ابدأ", "small", function () { runner(kind, [x], "practice", arg); }));

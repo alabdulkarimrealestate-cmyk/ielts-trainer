@@ -194,6 +194,7 @@ h1,h2,h3{margin:0 0 .4em}
 .rl-item-main{flex:1; min-width:0}
 .rl-item-title{font-weight:700; font-size:15px; text-align:left}
 .rl-item-meta{font-size:12px; color:var(--muted); text-align:left}
+.rl-item-new{font-size:12px; color:var(--warn); margin-top:2px}
 .rl-item-best{font-size:12px; color:var(--good); margin-top:2px}
 @media (max-width:640px){ .rl-widget,.rl-rev-ans,.rl-why,.rl-rev-acts{margin-inline-start:0; margin-left:0} .rl-opt{min-height:48px} }
 .fe-box{direction:ltr; justify-content:flex-start; gap:6px; line-height:1.4}
