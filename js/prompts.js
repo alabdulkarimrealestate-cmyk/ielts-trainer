@@ -362,6 +362,13 @@ topic
 
   // Human-readable description of any drill item type (for the error chat).
   function describeItem(item) {
+    if (item.rl) {
+      var r = item.rl;
+      return (r.skill === "listening" ? "Listening" : "Reading") + ' question (' + r.type + ') from "' + r.title + '": ' + r.prompt +
+             (r.options ? ' Options: ' + r.options.join(" | ") + '.' : '') + (r.headings ? ' Headings: ' + JSON.stringify(r.headings) + '.' : '') +
+             ' Correct answer: "' + r.correct + '". The student answered: "' + r.given + '". The deciding evidence in the ' +
+             (r.skill === "listening" ? "recording" : "passage") + ': "' + (r.evidence || "none - the statement is NOT GIVEN") + '". Official explanation: ' + r.why;
+    }
     if (item.rule === "find_error")
       return 'Proofreading item — the learner had to tap the one wrong word in: "' + item.sentence + '". The wrong word is "' +
              item.words[item.error_index] + '"; the correction is "' + item.correction + '".';

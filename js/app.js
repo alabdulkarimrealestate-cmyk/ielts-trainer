@@ -28,11 +28,12 @@
   function go(route, arg) {
     currentRoute = route;
     if (window.Chat) window.Chat.stopActive();   // stop mic / speech when leaving a screen
+    if (window.RL) window.RL.stop();             // ...and any running Reading/Listening timer or audio
     window.scrollTo(0, 0);
     clear(view);
     (VIEWS[route] || VIEWS.today)(arg);
     var navId = (route === "session") ? "practice" : (MORE_ROUTES[route] ? "more" : route);
-    var bottomId = { dashboard: "more", plan: "more", report: "more", log: "more" }[navId] || navId;
+    var bottomId = { dashboard: "more", plan: "more", report: "more", log: "more", rl: "practice" }[navId] || navId;
     if (window.Recorder && route !== "speak") window.Recorder.cancel();   // never leave the mic open behind a screen
     Array.prototype.forEach.call(document.querySelectorAll(".navbtn[data-route]"), function (b) {
       b.classList.toggle("active", b.dataset.route === navId);
@@ -219,6 +220,9 @@
   /* ---------------- PRACTICE (pick a rule) ---------------- */
   function practiceView() {
     var wrap = el("div", "page");
+    var rlBtn = el("button", "btn wide", "📖🎧 قراءة واستماع — نصوص وتسجيلات بأسئلة الامتحان");
+    rlBtn.type = "button"; rlBtn.onclick = function () { go("rl"); };
+    wrap.appendChild(rlBtn);
     wrap.appendChild(el("h2", "page-title", "تدرّب على قاعدة واحدة"));
     var groups = {};
     window.RULES.forEach(function (r) { (groups[r.group] = groups[r.group] || []).push(r); });

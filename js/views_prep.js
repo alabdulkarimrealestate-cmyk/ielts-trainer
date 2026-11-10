@@ -119,6 +119,11 @@
     if (a === "session") return go("session");
     if (a === "load") return go("load");
     if (a === "vocab_mix") return window.App.startVocabMix();
+    if (a.indexOf("rl:") === 0) {          // in-app Reading / Listening practice (js/rl.js)
+      var w = a.slice(3);
+      if (w === "test") return go("rl", { tab: "reading", taskKey: t.key, minutes: t.min });
+      return go("rl", { tab: w, start: "practice", taskKey: t.key, minutes: t.min });
+    }
     if (a.indexOf("rule:") === 0) {
       var rid = a.slice(5);
       if (window.RULE_MAP && window.RULE_MAP[rid] && window.itemsForRule(rid).length) return window.App.startRule(rid);
@@ -133,6 +138,9 @@
     a = a || "none";
     if (a === "session") return "ابدأ الجلسة";
     if (a === "vocab_mix") return "تدرّب";
+    if (a === "rl:reading") return "📖 اقرأ";
+    if (a === "rl:listening") return "🎧 استمع";
+    if (a === "rl:test") return "📝 اختر امتحانًا";
     if (a === "load") return "جلسة ضغط";
     if (a.indexOf("rule:") === 0) return "تدرّب";
     if (a.indexOf("writing:") === 0) return "اكتب";
@@ -1091,7 +1099,7 @@
     var wrap = el("div", "page");
     wrap.appendChild(el("h2", "page-title", "المزيد"));
     var grid = el("div", "quick-grid");
-    [["log", "📝", "سجّل نتيجة (L/R · مدرّس)"], ["dashboard", "📊", "لوحة القواعد"], ["plan", "🗓️", "الخطة والإعدادات"], ["report", "🤖", "تقرير AI الأسبوعي"],
+    [["rl", "📖", "اقرأ واسمع (Reading · Listening)"], ["log", "📝", "سجّل نتيجة (L/R · مدرّس)"], ["dashboard", "📊", "لوحة القواعد"], ["plan", "🗓️", "الخطة والإعدادات"], ["report", "🤖", "تقرير AI الأسبوعي"],
      ["load", "⚡", "جلسة تحت الضغط"], ["roadmap", "🗺️", "خريطة القواعد"], ["dictionary", "🔊", "قاموس النطق"], ["reference", "📚", "مرجع المتلازمات"],
      ["diagrams", "🖼️", "رسوم توضيحية"], ["translate", "🌐", "ترجمة"], ["data", "💾", "البيانات والمزامنة"]].forEach(function (q) {
       var b = el("button", "quick", q[1] + "\n" + q[2]); b.type = "button"; b.onclick = function () { go(q[0]); }; grid.appendChild(b);
@@ -1103,6 +1111,7 @@
   window.EXTRA_ROUTES = [
     { id: "today",    label: "اليوم",       icon: "📅" },
     { id: "practice", label: "تدرّب",       icon: "🎯" },
+    { id: "rl",       label: "اقرأ واسمع",  icon: "📖" },
     { id: "speak",    label: "تكلّم",       icon: "🗣" },
     { id: "writing",  label: "الكتابة",     icon: "✍️" },
     { id: "log",      label: "سجّل نتيجة",  icon: "📝" },
@@ -1113,6 +1122,7 @@
     { id: "more",     label: "المزيد",      icon: "⋯" }
   ];
   window.EXTRA_VIEWS = { today: todayView, plan: planView, log: logView, writing: writingView, progress: progressView, report: reportView, more: moreView,
-                         speak: function (arg) { if (window.Speak) window.Speak.view(arg); } };
+                         speak: function (arg) { if (window.Speak) window.Speak.view(arg); },
+                         rl: function (arg) { if (window.RL) window.RL.view(arg); } };
   window.PrepViews = { aiBox: aiBox, aiSetup: aiSetup, lineChart: lineChart, decisionCard: decisionCard };
 })();
